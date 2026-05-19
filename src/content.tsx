@@ -12,6 +12,18 @@ const COLORS: Array<{ color: HighlightColor; value: string; label: string }> = [
   { color: "coral", value: "#FFAFA1", label: "珊瑚" },
 ];
 
+const INTERACTIVE_CONTENT_SELECTOR = [
+  "a[href]",
+  "button",
+  "input",
+  "textarea",
+  "select",
+  "summary",
+  "[role='button']",
+  "[role='link']",
+  "[contenteditable='true']",
+].join(",");
+
 type EditorFocus = "note" | "tags";
 type ToolbarRootState = { root: Root; node: HTMLElement } | null;
 type PageStatusRequest = { type: "LIUCAI_GET_PAGE_STATUS" };
@@ -109,17 +121,28 @@ async function handleDocumentClick(event: MouseEvent): Promise<void> {
   const highlightEl = target?.closest?.(".liucai-highlight") as HTMLElement | null;
   if (!highlightEl) return;
 
-  event.preventDefault();
-  event.stopPropagation();
-
   const id = highlightEl.dataset.id;
   if (!id) return;
+
+  if (shouldAllowNativeClick(event, target, highlightEl)) return;
+
+  event.preventDefault();
+  event.stopPropagation();
 
   const record = await db.highlights.get(id);
   if (!record || record.deletedAt) return;
 
   const rect = highlightEl.getBoundingClientRect();
   showHighlightToolbar(normalizeHighlightRecord(record), rect.left + rect.width / 2, Math.max(8, rect.top - 54));
+}
+
+function shouldAllowNativeClick(event: MouseEvent, target: Element | null, highlightEl: HTMLElement): boolean {
+  if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) {
+    return true;
+  }
+
+  const interactive = target?.closest?.(INTERACTIVE_CONTENT_SELECTOR);
+  return Boolean(interactive && interactive.contains(highlightEl));
 }
 
 function showSelectionToolbar(centerX: number, top: number): void {
@@ -531,8 +554,20 @@ async function createHighlight(
     updatedAt: now,
   };
 
-  await db.highlights.add(highlight);
   const spans = applyHighlight(range, highlight);
+  if (spans.length === 0) {
+    console.warn("[六彩] create highlight skipped: no DOM spans were created");
+    currentSelectionRange = null;
+    return;
+  }
+
+  try {
+    await db.highlights.add(highlight);
+  } catch (error) {
+    removeHighlightFromDom(highlight.id);
+    throw error;
+  }
+
   const rect = spans[0]?.getBoundingClientRect() ?? range.getBoundingClientRect();
   currentSelectionRange = null;
 

@@ -1,6 +1,14 @@
 import type { HighlightSelector } from "./types";
 
 const IGNORED_TAGS = new Set(["SCRIPT", "STYLE", "NOSCRIPT", "TEXTAREA", "INPUT", "SELECT", "OPTION"]);
+const LIUCAI_UI_SELECTOR = [
+  ".liucai-toolbar",
+  ".liucai-popover",
+  ".liucai-sidebar-root",
+  ".liucai-mini-sidebar-root",
+  ".liucai-sidebar",
+  ".liucai-mini-sidebar",
+].join(",");
 
 export interface TextNodeEntry {
   node: Text;
@@ -28,7 +36,7 @@ function getTextSnapshot(root: Node = document.body): DocumentTextSnapshot {
   const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
     acceptNode(node) {
       const parent = node.parentElement;
-      if (!parent || IGNORED_TAGS.has(parent.tagName) || parent.closest(".liucai-toolbar,.liucai-popover")) {
+      if (!parent || IGNORED_TAGS.has(parent.tagName) || parent.closest(LIUCAI_UI_SELECTOR)) {
         return NodeFilter.FILTER_REJECT;
       }
       if (!node.nodeValue) {
