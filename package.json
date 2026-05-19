@@ -1,0 +1,24 @@
+{
+  "name": "liucai",
+  "version": "0.1.0",
+  "private": true,
+  "description": "六彩：Chrome-only local web highlighter with IndexedDB storage.",
+  "type": "module",
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "dexie": "^4.0.11",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0"
+  },
+  "devDependencies": {
+    "@types/chrome": "^0.0.306",
+    "@types/react": "^19.2.2",
+    "@types/react-dom": "^19.2.2",
+    "@vitejs/plugin-react": "^5.0.4",
+    "typescript": "^5.8.3",
+    "vite": "^7.1.12"
+  }
+}
