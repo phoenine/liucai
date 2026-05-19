@@ -19,6 +19,9 @@ type PageStatusRequest = { type: "LIUCAI_GET_PAGE_STATUS" };
 let currentSelectionRange: Range | null = null;
 let toolbarRoot: ToolbarRootState = null;
 let popoverRoot: ToolbarRootState = null;
+let sidebarRoot: ToolbarRootState = null;
+let miniSidebarRoot: ToolbarRootState = null;
+let sidebarOpen = false;
 let pagePromise: Promise<PageRecord> | null = null;
 
 const canonicalUrl = canonicalizeUrl(location.href);
@@ -28,6 +31,7 @@ void initialize().catch((error) => reportError("initialize", error));
 async function initialize(): Promise<void> {
   await getCurrentPage();
   await restoreHighlights();
+  await refreshSidebarData();
 
   document.addEventListener("mouseup", handleMouseUp, true);
   document.addEventListener("keydown", handleKeyDown, true);
@@ -44,6 +48,8 @@ function cleanup(): void {
   window.removeEventListener("beforeunload", cleanup);
   hideToolbar();
   hidePopover();
+  hideSidebar();
+  hideMiniSidebar();
 }
 
 function handleKeyDown(event: KeyboardEvent): void {
@@ -77,7 +83,7 @@ async function restoreHighlights(): Promise<void> {
 }
 
 function handleMouseUp(event: MouseEvent): void {
-  if ((event.target as Element | null)?.closest?.(".liucai-toolbar,.liucai-popover,.liucai-highlight")) {
+  if ((event.target as Element | null)?.closest?.(".liucai-toolbar,.liucai-popover,.liucai-sidebar,.liucai-mini-sidebar,.liucai-highlight")) {
     return;
   }
 
@@ -98,7 +104,7 @@ function handleDocumentClickEvent(event: MouseEvent): void {
 
 async function handleDocumentClick(event: MouseEvent): Promise<void> {
   const target = event.target as Element | null;
-  if (target?.closest?.(".liucai-toolbar,.liucai-popover")) return;
+  if (target?.closest?.(".liucai-toolbar,.liucai-popover,.liucai-sidebar,.liucai-mini-sidebar")) return;
 
   const highlightEl = target?.closest?.(".liucai-highlight") as HTMLElement | null;
   if (!highlightEl) return;
@@ -197,6 +203,91 @@ function ExistingHighlightToolbar(props: {
   );
 }
 
+function MiniSidebarLauncher(props: { count: number; open: boolean; onToggle: () => void }) {
+  return (
+    <button className={`liucai-mini-sidebar${props.open ? " is-open" : ""}`} title="六彩划线列表" onClick={props.onToggle}>
+      <span className="liucai-mini-sidebar__icon">{icons.list}</span>
+      <span className="liucai-mini-sidebar__count">{props.count}</span>
+    </button>
+  );
+}
+
+function HighlightSidebar(props: {
+  records: HighlightRecord[];
+  onClose: () => void;
+  onLocate: (id: string) => void;
+  onEdit: (record: HighlightRecord) => void;
+  onCopy: (record: HighlightRecord) => void;
+  onDelete: (id: string) => void;
+}) {
+  return (
+    <aside className="liucai-sidebar" aria-label="六彩划线列表">
+      <header className="liucai-sidebar__header">
+        <div>
+          <div className="liucai-sidebar__eyebrow">当前页面</div>
+          <h2>划线列表</h2>
+        </div>
+        <button className="liucai-sidebar__close" title="收起" onClick={props.onClose}>{icons.close}</button>
+      </header>
+      <div className="liucai-sidebar__summary">
+        <span>{props.records.length} 条划线</span>
+        <span>{document.title || "未命名页面"}</span>
+      </div>
+      {props.records.length === 0 ? (
+        <div className="liucai-sidebar__empty">
+          <strong>还没有划线</strong>
+          <span>在网页中选中文本后，点击颜色即可加入这里。</span>
+        </div>
+      ) : (
+        <div className="liucai-sidebar__list">
+          {props.records.map((record, index) => (
+            <HighlightSidebarItem
+              key={record.id}
+              index={index + 1}
+              record={record}
+              onLocate={() => props.onLocate(record.id)}
+              onEdit={() => props.onEdit(record)}
+              onCopy={() => props.onCopy(record)}
+              onDelete={() => props.onDelete(record.id)}
+            />
+          ))}
+        </div>
+      )}
+    </aside>
+  );
+}
+
+function HighlightSidebarItem(props: {
+  index: number;
+  record: HighlightRecord;
+  onLocate: () => void;
+  onEdit: () => void;
+  onCopy: () => void;
+  onDelete: () => void;
+}) {
+  const tags = Array.isArray(props.record.tags) ? props.record.tags : [];
+  return (
+    <article className="liucai-sidebar-item" data-color={props.record.color}>
+      <button className="liucai-sidebar-item__main" onClick={props.onLocate} title="定位到网页划线">
+        <span className="liucai-sidebar-item__dot" />
+        <span className="liucai-sidebar-item__index">{String(props.index).padStart(2, "0")}</span>
+        <span className="liucai-sidebar-item__text">{props.record.text}</span>
+      </button>
+      {props.record.note.trim() ? <p className="liucai-sidebar-item__note">{props.record.note.trim()}</p> : null}
+      {tags.length > 0 ? (
+        <div className="liucai-sidebar-item__tags">
+          {tags.map((tag) => <span key={tag}>#{tag}</span>)}
+        </div>
+      ) : null}
+      <div className="liucai-sidebar-item__actions">
+        <button onClick={props.onEdit}>编辑</button>
+        <button onClick={props.onCopy}>复制</button>
+        <button data-danger="true" onClick={props.onDelete}>删除</button>
+      </div>
+    </article>
+  );
+}
+
 function ColorButton(props: { item: { color: HighlightColor; value: string; label: string }; onClick: () => void }) {
   return (
     <button
@@ -242,6 +333,7 @@ function showEditorPopover(record: HighlightRecord, left: number, top: number, f
       onSave={(id, note, tags) => runAsync("save highlight meta", () => saveHighlightMeta(id, note, tags))}
     />
   ));
+  fitPopoverInViewport(node);
 }
 
 function EditorPopover(props: {
@@ -256,7 +348,6 @@ function EditorPopover(props: {
   return (
     <>
       <div className="liucai-popover-title">批注与标签</div>
-      <div className="liucai-popover-excerpt">{props.record.text}</div>
       <label className="liucai-field-label">批注</label>
       <textarea
         autoFocus={props.focus === "note"}
@@ -294,10 +385,23 @@ function createPopoverNode(left: number, top: number): HTMLElement {
   hidePopover();
   const node = document.createElement("div");
   node.className = "liucai-popover liucai-editor-popover";
-  node.style.left = `${Math.min(Math.max(8, left), window.innerWidth - 336)}px`;
-  node.style.top = `${Math.min(Math.max(8, top), window.innerHeight - 292)}px`;
+  node.style.left = `${Math.min(Math.max(8, left), Math.max(8, window.innerWidth - 336))}px`;
+  node.style.top = `${Math.min(Math.max(8, top), Math.max(8, window.innerHeight - 328))}px`;
+  node.style.visibility = "hidden";
   document.body.append(node);
   return node;
+}
+
+function fitPopoverInViewport(node: HTMLElement): void {
+  window.requestAnimationFrame(() => {
+    const margin = 8;
+    const rect = node.getBoundingClientRect();
+    const nextLeft = Math.min(Math.max(margin, rect.left), Math.max(margin, window.innerWidth - rect.width - margin));
+    const nextTop = Math.min(Math.max(margin, rect.top), Math.max(margin, window.innerHeight - rect.height - margin));
+    node.style.left = `${nextLeft}px`;
+    node.style.top = `${nextTop}px`;
+    node.style.visibility = "visible";
+  });
 }
 
 function renderInto(node: HTMLElement, children: ReactNode): { root: Root; node: HTMLElement } {
@@ -316,6 +420,88 @@ function hidePopover(): void {
   popoverRoot?.root.unmount();
   popoverRoot?.node.remove();
   popoverRoot = null;
+}
+
+async function refreshSidebarData(): Promise<void> {
+  const records = await getActiveHighlights(canonicalUrl);
+  renderMiniSidebar(records.length);
+  if (sidebarOpen) {
+    renderSidebar(records);
+  }
+}
+
+function renderMiniSidebar(count: number): void {
+  const launcher = <MiniSidebarLauncher count={count} open={sidebarOpen} onToggle={() => runAsync("toggle sidebar", toggleSidebar)} />;
+  if (miniSidebarRoot) {
+    miniSidebarRoot.root.render(launcher);
+    return;
+  }
+  miniSidebarRoot = renderInto(createMiniSidebarNode(), launcher);
+}
+
+function createMiniSidebarNode(): HTMLElement {
+  const node = document.createElement("div");
+  node.className = "liucai-mini-sidebar-root";
+  document.body.append(node);
+  return node;
+}
+
+async function toggleSidebar(): Promise<void> {
+  if (sidebarOpen) {
+    hideSidebar();
+    sidebarOpen = false;
+    await refreshSidebarData();
+    return;
+  }
+
+  sidebarOpen = true;
+  await refreshSidebarData();
+}
+
+function renderSidebar(records: HighlightRecord[]): void {
+  hideSidebar();
+  const node = document.createElement("div");
+  node.className = "liucai-sidebar-root";
+  document.body.append(node);
+  sidebarRoot = renderInto(node, (
+    <HighlightSidebar
+      records={records}
+      onClose={() => {
+        sidebarOpen = false;
+        hideSidebar();
+        runAsync("refresh mini sidebar", refreshSidebarData);
+      }}
+      onLocate={locateHighlight}
+      onEdit={editHighlightFromSidebar}
+      onCopy={(record) => runAsync("copy sidebar highlight text", () => copyHighlightText(record))}
+      onDelete={(id) => runAsync("delete sidebar highlight", () => deleteHighlight(id))}
+    />
+  ));
+}
+
+function hideSidebar(): void {
+  sidebarRoot?.root.unmount();
+  sidebarRoot?.node.remove();
+  sidebarRoot = null;
+}
+
+function hideMiniSidebar(): void {
+  miniSidebarRoot?.root.unmount();
+  miniSidebarRoot?.node.remove();
+  miniSidebarRoot = null;
+}
+
+function locateHighlight(id: string): void {
+  const span = getHighlightSpans(id)[0];
+  if (!span) return;
+  span.scrollIntoView({ behavior: "smooth", block: "center", inline: "nearest" });
+  span.classList.add("liucai-highlight--focused");
+  window.setTimeout(() => span.classList.remove("liucai-highlight--focused"), 1400);
+}
+
+function editHighlightFromSidebar(record: HighlightRecord): void {
+  hideToolbar();
+  showEditorPopover(record, window.innerWidth - 690, 88, "note");
 }
 
 async function createHighlight(
@@ -353,6 +539,7 @@ async function createHighlight(
   if (options.openEditor) {
     showEditorPopover(highlight, rect.left, rect.bottom + 8, options.focus ?? "note");
   }
+  await refreshSidebarData();
 }
 
 async function saveHighlightMeta(id: string, note: string, tags: string[]): Promise<void> {
@@ -363,6 +550,7 @@ async function saveHighlightMeta(id: string, note: string, tags: string[]): Prom
   await db.highlights.put(updated);
   updateHighlightAttributes(updated);
   hidePopover();
+  await refreshSidebarData();
 }
 
 async function updateHighlightColor(id: string, color: HighlightColor): Promise<void> {
@@ -373,6 +561,7 @@ async function updateHighlightColor(id: string, color: HighlightColor): Promise<
   await db.highlights.put(updated);
   for (const span of getHighlightSpans(id)) span.dataset.color = color;
   hideToolbar();
+  await refreshSidebarData();
 }
 
 async function copyHighlightText(record: HighlightRecord): Promise<void> {
@@ -411,6 +600,7 @@ async function deleteHighlight(id: string): Promise<void> {
   removeHighlightFromDom(id);
   hideToolbar();
   hidePopover();
+  await refreshSidebarData();
 }
 
 function handleRuntimeMessage(
@@ -496,5 +686,11 @@ const icons = {
   ),
   palette: (
     <svg {...iconProps}><circle cx="13.5" cy="6.5" r=".5" fill="currentColor" /><circle cx="17.5" cy="10.5" r=".5" fill="currentColor" /><circle cx="8.5" cy="7.5" r=".5" fill="currentColor" /><circle cx="6.5" cy="12.5" r=".5" fill="currentColor" /><path d="M12 22a10 10 0 1 1 10-10 3.5 3.5 0 0 1-3.5 3.5h-1.2a2 2 0 0 0-1.4 3.4l.3.3A1.7 1.7 0 0 1 15 22Z" /></svg>
+  ),
+  list: (
+    <svg {...iconProps}><path d="M8 6h13" /><path d="M8 12h13" /><path d="M8 18h13" /><path d="M3 6h.01" /><path d="M3 12h.01" /><path d="M3 18h.01" /></svg>
+  ),
+  close: (
+    <svg {...iconProps}><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg>
   ),
 };
