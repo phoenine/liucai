@@ -61,6 +61,10 @@ export async function getActiveHighlights(canonicalUrl: string): Promise<Highlig
   const records = await db.highlights.where("canonicalUrl").equals(canonicalUrl).toArray();
   return records
     .filter((record) => !record.deletedAt)
-    .map((record) => ({ ...record, tags: Array.isArray(record.tags) ? record.tags : [] }))
+    .map(normalizeHighlightRecord)
     .sort((a, b) => a.selector.start - b.selector.start);
+}
+
+export function normalizeHighlightRecord(record: HighlightRecord): HighlightRecord {
+  return { ...record, tags: Array.isArray(record.tags) ? record.tags : [] };
 }

@@ -1,6 +1,6 @@
 import { type ReactNode, useState } from "react";
 import { createRoot, type Root } from "react-dom/client";
-import { db, getActiveHighlights, upsertPage } from "./db";
+import { db, getActiveHighlights, normalizeHighlightRecord, upsertPage } from "./db";
 import { canonicalizeUrl } from "./url";
 import { createSelectorFromRange, rangesFromSelectors } from "./domText";
 import { applyHighlight, removeHighlightFromDom, updateHighlightAttributes } from "./highlightDom";
@@ -113,7 +113,7 @@ async function handleDocumentClick(event: MouseEvent): Promise<void> {
   if (!record || record.deletedAt) return;
 
   const rect = highlightEl.getBoundingClientRect();
-  showHighlightToolbar(normalizeRecord(record), rect.left + rect.width / 2, Math.max(8, rect.top - 54));
+  showHighlightToolbar(normalizeHighlightRecord(record), rect.left + rect.width / 2, Math.max(8, rect.top - 54));
 }
 
 function showSelectionToolbar(centerX: number, top: number): void {
@@ -232,7 +232,7 @@ function IconButton(props: { kind: string; label: string; children: ReactNode; o
 }
 
 function showEditorPopover(record: HighlightRecord, left: number, top: number, focus: EditorFocus = "note"): void {
-  const safeRecord = normalizeRecord(record);
+  const safeRecord = normalizeHighlightRecord(record);
   const node = createPopoverNode(left, top);
   popoverRoot = renderInto(node, (
     <EditorPopover
@@ -359,7 +359,7 @@ async function saveHighlightMeta(id: string, note: string, tags: string[]): Prom
   const record = await db.highlights.get(id);
   if (!record) return;
 
-  const updated: HighlightRecord = { ...normalizeRecord(record), note, tags, updatedAt: new Date().toISOString() };
+  const updated: HighlightRecord = { ...normalizeHighlightRecord(record), note, tags, updatedAt: new Date().toISOString() };
   await db.highlights.put(updated);
   updateHighlightAttributes(updated);
   hidePopover();
@@ -369,7 +369,7 @@ async function updateHighlightColor(id: string, color: HighlightColor): Promise<
   const record = await db.highlights.get(id);
   if (!record) return;
 
-  const updated: HighlightRecord = { ...normalizeRecord(record), color, updatedAt: new Date().toISOString() };
+  const updated: HighlightRecord = { ...normalizeHighlightRecord(record), color, updatedAt: new Date().toISOString() };
   await db.highlights.put(updated);
   for (const span of getHighlightSpans(id)) span.dataset.color = color;
   hideToolbar();
@@ -407,7 +407,7 @@ async function deleteHighlight(id: string): Promise<void> {
   const record = await db.highlights.get(id);
   if (!record) return;
 
-  await db.highlights.put({ ...normalizeRecord(record), deletedAt: new Date().toISOString(), updatedAt: new Date().toISOString() });
+  await db.highlights.put({ ...normalizeHighlightRecord(record), deletedAt: new Date().toISOString(), updatedAt: new Date().toISOString() });
   removeHighlightFromDom(id);
   hideToolbar();
   hidePopover();
@@ -445,10 +445,6 @@ function isPageStatusRequest(message: unknown): message is PageStatusRequest {
 
 function getHighlightSpans(id: string): HTMLElement[] {
   return Array.from(document.querySelectorAll<HTMLElement>(`.liucai-highlight[data-id="${CSS.escape(id)}"]`));
-}
-
-function normalizeRecord(record: HighlightRecord): HighlightRecord {
-  return { ...record, tags: Array.isArray(record.tags) ? record.tags : [] };
 }
 
 function parseTags(value: string): string[] {
