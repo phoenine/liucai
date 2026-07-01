@@ -51,8 +51,7 @@ p {
   margin: 0;
 }
 
-.lc-popup__card,
-.lc-popup__hint {
+.lc-popup__card {
   background: #ffffff;
   border: 1px solid #e5e7eb;
   border-radius: 14px;
@@ -76,6 +75,11 @@ p {
   background: linear-gradient(180deg, #ffffff 0%, #fff7ed 100%);
 }
 
+.lc-popup__status--disabled {
+  background: #fff7ed;
+  border-color: #fed7aa;
+}
+
 .lc-popup__count {
   color: #0f172a;
   font-size: 34px;
@@ -83,6 +87,14 @@ p {
   letter-spacing: -0.04em;
   line-height: 1;
   margin-bottom: 4px;
+}
+
+.lc-popup__disabled-state {
+  color: #c2410c;
+  font-size: 24px;
+  font-weight: 800;
+  line-height: 1.2;
+  margin-bottom: 5px;
 }
 
 .lc-popup__muted {
@@ -99,9 +111,35 @@ p {
   -webkit-line-clamp: 2;
 }
 
-.lc-popup__hint {
-  color: #475569;
-  font-size: 12px;
-  line-height: 1.5;
+.lc-popup__site-action {
   margin-top: 10px;
+}
+
+.lc-popup__site-button {
+  background: #ffffff;
+  border: 1px solid #fed7aa;
+  border-radius: 10px;
+  color: #9a3412;
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  height: 36px;
+  width: 100%;
+}
+
+.lc-popup__site-button--restore {
+  background: #0f172a;
+  border-color: #0f172a;
+  color: #ffffff;
+}
+
+.lc-popup__site-button:disabled {
+  cursor: wait;
+  opacity: 0.6;
+}
+
+.lc-popup__action-error {
+  color: #b91c1c;
+  margin-top: 8px;
 }

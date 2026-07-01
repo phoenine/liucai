@@ -1,4 +1,5 @@
 import Dexie, { type Table } from "dexie";
+import { generateUuid } from "./id";
 import type { HighlightRecord, PageRecord } from "./types";
 
 class LiucaiDatabase extends Dexie {
@@ -45,7 +46,7 @@ export async function upsertPage(canonicalUrl: string, originalUrl: string, titl
   }
 
   const page: PageRecord = {
-    id: crypto.randomUUID(),
+    id: generateUuid(),
     canonicalUrl,
     originalUrl,
     title,
