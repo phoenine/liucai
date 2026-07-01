@@ -4,6 +4,8 @@ import { db, getActiveHighlights, normalizeHighlightRecord, upsertPage } from ".
 import { canonicalizeUrl } from "./url";
 import { createSelectorFromRange, rangesFromSelectors } from "./domText";
 import { applyHighlight, removeHighlightFromDom, updateHighlightAttributes } from "./highlightDom";
+import { generateUuid } from "./id";
+import { isHostnameDisabled, setHostnameDisabled } from "./sitePreferences";
 import type { HighlightColor, HighlightRecord, PageRecord } from "./types";
 
 const COLORS: Array<{ color: HighlightColor; value: string; label: string }> = [
@@ -27,6 +29,7 @@ const INTERACTIVE_CONTENT_SELECTOR = [
 type EditorFocus = "note" | "tags";
 type ToolbarRootState = { root: Root; node: HTMLElement } | null;
 type PageStatusRequest = { type: "LIUCAI_GET_PAGE_STATUS" };
+type SetSiteDisabledRequest = { type: "LIUCAI_SET_SITE_DISABLED"; disabled: boolean };
 
 let currentSelectionRange: Range | null = null;
 let toolbarRoot: ToolbarRootState = null;
@@ -35,33 +38,85 @@ let sidebarRoot: ToolbarRootState = null;
 let miniSidebarRoot: ToolbarRootState = null;
 let sidebarOpen = false;
 let pagePromise: Promise<PageRecord> | null = null;
+let pageActive = false;
+let activationPromise: Promise<void> | null = null;
 
 const canonicalUrl = canonicalizeUrl(location.href);
+const hostname = location.hostname;
 
 void initialize().catch((error) => reportError("initialize", error));
 
 async function initialize(): Promise<void> {
+  chrome.runtime.onMessage.addListener(handleRuntimeMessage);
+  chrome.storage.onChanged.addListener(handleStorageChange);
+  window.addEventListener("beforeunload", cleanup);
+  await syncActivation();
+}
+
+async function syncActivation(): Promise<void> {
+  if (await isHostnameDisabled(hostname)) {
+    deactivate();
+    return;
+  }
+
+  await activate();
+}
+
+function activate(): Promise<void> {
+  if (pageActive) {
+    return Promise.resolve();
+  }
+
+  activationPromise ??= activatePage().finally(() => {
+    activationPromise = null;
+  });
+  return activationPromise;
+}
+
+async function activatePage(): Promise<void> {
   await getCurrentPage();
   await restoreHighlights();
   await refreshSidebarData();
 
+  if (await isHostnameDisabled(hostname)) {
+    deactivate();
+    return;
+  }
+
   document.addEventListener("mouseup", handleMouseUp, true);
   document.addEventListener("keydown", handleKeyDown, true);
   document.addEventListener("click", handleDocumentClickEvent, true);
-  chrome.runtime.onMessage.addListener(handleRuntimeMessage);
-  window.addEventListener("beforeunload", cleanup);
+  pageActive = true;
 }
 
-function cleanup(): void {
+function deactivate(): void {
   document.removeEventListener("mouseup", handleMouseUp, true);
   document.removeEventListener("keydown", handleKeyDown, true);
   document.removeEventListener("click", handleDocumentClickEvent, true);
-  chrome.runtime.onMessage.removeListener(handleRuntimeMessage);
-  window.removeEventListener("beforeunload", cleanup);
+  pageActive = false;
+  sidebarOpen = false;
+  currentSelectionRange = null;
   hideToolbar();
   hidePopover();
   hideSidebar();
   hideMiniSidebar();
+  for (const span of Array.from(document.querySelectorAll<HTMLElement>(".liucai-highlight"))) {
+    span.replaceWith(...Array.from(span.childNodes));
+  }
+}
+
+function cleanup(): void {
+  deactivate();
+  chrome.runtime.onMessage.removeListener(handleRuntimeMessage);
+  chrome.storage.onChanged.removeListener(handleStorageChange);
+  window.removeEventListener("beforeunload", cleanup);
+}
+
+function handleStorageChange(_changes: Record<string, chrome.storage.StorageChange>, areaName: string): void {
+  if (areaName !== "local") {
+    return;
+  }
+  void syncActivation().catch((error) => reportError("site setting sync", error));
 }
 
 function handleKeyDown(event: KeyboardEvent): void {
@@ -542,7 +597,7 @@ async function createHighlight(
   const page = await getCurrentPage();
   const now = new Date().toISOString();
   const highlight: HighlightRecord = {
-    id: crypto.randomUUID(),
+    id: generateUuid(),
     pageId: page.id,
     canonicalUrl,
     text: selector.exact,
@@ -643,25 +698,61 @@ function handleRuntimeMessage(
   _sender: chrome.runtime.MessageSender,
   sendResponse: (response?: unknown) => void,
 ): boolean | undefined {
-  if (!isPageStatusRequest(message)) {
-    return undefined;
-  }
-
-  void getActiveHighlights(canonicalUrl)
-    .then((records) => {
-      sendResponse({
-        ok: true,
-        canonicalUrl,
-        title: document.title,
-        highlightCount: records.length,
-      });
-    })
-    .catch((error) => {
+  if (isPageStatusRequest(message)) {
+    void getPageStatus().then(sendResponse).catch((error) => {
       reportError("popup status", error);
       sendResponse({ ok: false, error: stringifyError(error) });
     });
+    return true;
+  }
 
-  return true;
+  if (isSetSiteDisabledRequest(message)) {
+    void setHostnameDisabled(hostname, message.disabled)
+      .then(async () => {
+        await syncActivation();
+        return getPageStatus();
+      })
+      .then(sendResponse)
+      .catch((error) => {
+        reportError("site disabled update", error);
+        sendResponse({ ok: false, error: stringifyError(error) });
+      });
+    return true;
+  }
+
+  return undefined;
+}
+
+async function getPageStatus(): Promise<{
+  ok: true;
+  canonicalUrl: string;
+  hostname: string;
+  title: string;
+  highlightCount: number;
+  disabled: boolean;
+}> {
+  const [records, disabled] = await Promise.all([
+    getActiveHighlights(canonicalUrl),
+    isHostnameDisabled(hostname),
+  ]);
+
+  return {
+    ok: true,
+    canonicalUrl,
+    hostname,
+    title: document.title,
+    highlightCount: records.length,
+    disabled,
+  };
+}
+
+function isSetSiteDisabledRequest(message: unknown): message is SetSiteDisabledRequest {
+  return (
+    typeof message === "object"
+    && message !== null
+    && (message as SetSiteDisabledRequest).type === "LIUCAI_SET_SITE_DISABLED"
+    && typeof (message as SetSiteDisabledRequest).disabled === "boolean"
+  );
 }
 
 function isPageStatusRequest(message: unknown): message is PageStatusRequest {
