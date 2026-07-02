@@ -1,16 +1,7 @@
 import { useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
+import type { PageStatus, PageStatusResponse } from "./messages";
 import "./popup.css";
-
-interface PageStatus {
-  ok: boolean;
-  canonicalUrl?: string;
-  hostname?: string;
-  title?: string;
-  highlightCount?: number;
-  disabled?: boolean;
-  error?: string;
-}
 
 type LoadState =
   | { status: "loading" }
@@ -64,7 +55,7 @@ function PopupApp() {
       <section className="lc-popup__card">
         <h2>快速操作</h2>
         <ul>
-          <li>选中文本：六色高亮 + 批注 + 标签</li>
+          <li>选中文本：三色高亮 + 批注 + 标签</li>
           <li>点击已划线：调色盘 + 批注 + 标签 + 复制 + 删除</li>
           <li>数据保存到 Chrome IndexedDB</li>
         </ul>
@@ -125,7 +116,7 @@ async function loadCurrentPageStatus(): Promise<LoadState> {
   }
 
   try {
-    const page = (await chrome.tabs.sendMessage(tab.id, { type: "LIUCAI_GET_PAGE_STATUS" })) as PageStatus | undefined;
+    const page = (await chrome.tabs.sendMessage(tab.id, { type: "LIUCAI_GET_PAGE_STATUS" })) as PageStatusResponse | undefined;
     if (!page?.ok) {
       return { status: "unavailable", message: page?.error ?? "当前页面暂不可读取。" };
     }
@@ -144,7 +135,7 @@ async function setCurrentSiteDisabled(disabled: boolean): Promise<PageStatus> {
   const page = (await chrome.tabs.sendMessage(tab.id, {
     type: "LIUCAI_SET_SITE_DISABLED",
     disabled,
-  })) as PageStatus | undefined;
+  })) as PageStatusResponse | undefined;
 
   if (!page?.ok) {
     throw new Error(page?.error ?? "网站设置更新失败。");
