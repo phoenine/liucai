@@ -21,6 +21,14 @@ test("shows complete highlight text and notes in sidebar cards", async () => {
   assert.doesNotMatch(noteRule, /(?:line-clamp|overflow:\s*hidden)/);
 });
 
+test("preserves semantic newlines in sidebar highlight text", async () => {
+  const css = await readFile(new URL("../public/content.css", import.meta.url), "utf8");
+  const textRule = css.match(/\.liucai-sidebar-item__text\s*\{[^}]*\}/s)?.[0];
+
+  assert.ok(textRule);
+  assert.match(textRule, /white-space:\s*pre-wrap;/);
+});
+
 test("styles note paragraphs and Markdown-lite lists", async () => {
   const css = await readFile(new URL("../public/content.css", import.meta.url), "utf8");
 

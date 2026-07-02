@@ -19,6 +19,7 @@ import {
   isSetSiteDisabledRequest,
   type PageStatus,
 } from "./messages";
+import { getRangeDisplayText } from "./rangeDisplayText";
 import { isHostnameDisabled, setHostnameDisabled } from "./sitePreferences";
 import type { HighlightColor, HighlightRecord, PageRecord } from "./types";
 import {
@@ -481,6 +482,7 @@ export class ContentController {
     if (!range) return;
     const selector = createSelectorFromRange(range);
     if (!selector) return;
+    const displayText = getRangeDisplayText(range);
 
     const page = await this.getCurrentPage();
     const now = new Date().toISOString();
@@ -488,7 +490,7 @@ export class ContentController {
       id: generateUuid(),
       pageId: page.id,
       canonicalUrl: this.identity.canonicalUrl,
-      text: selector.exact,
+      text: displayText || selector.exact,
       color,
       note: "",
       tags: [],
