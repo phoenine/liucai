@@ -7,12 +7,18 @@ const TRACKING_PARAMS = new Set([
   "fbclid",
   "gclid",
   "spm",
-  "from",
 ]);
+
+export interface PageIdentity {
+  href: string;
+  canonicalUrl: string;
+}
 
 export function canonicalizeUrl(rawUrl: string): string {
   const url = new URL(rawUrl);
-  url.hash = "";
+  if (!url.hash.startsWith("#/") && !url.hash.startsWith("#!/")) {
+    url.hash = "";
+  }
   for (const key of Array.from(url.searchParams.keys())) {
     if (TRACKING_PARAMS.has(key.toLowerCase())) {
       url.searchParams.delete(key);
@@ -22,4 +28,15 @@ export function canonicalizeUrl(rawUrl: string): string {
     url.pathname = url.pathname.slice(0, -1);
   }
   return url.toString();
+}
+
+export function createPageIdentity(rawUrl: string): PageIdentity {
+  return {
+    href: rawUrl,
+    canonicalUrl: canonicalizeUrl(rawUrl),
+  };
+}
+
+export function hasPageIdentityChanged(current: PageIdentity, nextHref: string): boolean {
+  return current.canonicalUrl !== canonicalizeUrl(nextHref);
 }
