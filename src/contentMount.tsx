@@ -58,7 +58,10 @@ export class ContentMounts {
   }
 
   renderSidebar(children: ReactNode): void {
-    this.hideSidebar();
+    if (this.sidebar) {
+      this.sidebar.root.render(children);
+      return;
+    }
     const node = document.createElement("div");
     node.className = "liucai-sidebar-root";
     document.body.append(node);

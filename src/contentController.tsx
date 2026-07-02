@@ -446,11 +446,11 @@ export class ContentController {
         }}
         onLocate={(id) => this.locateHighlight(id)}
         onEdit={(record) => this.editHighlightFromSidebar(record)}
-        onCopy={(record) => this.runAsync(
+        onCopy={(record) => this.runReported(
           "copy sidebar highlight text",
           () => this.copyHighlightText(record),
         )}
-        onDelete={(id) => this.runAsync(
+        onDelete={(id) => this.runReported(
           "delete sidebar highlight",
           () => this.deleteHighlight(id),
         )}
@@ -674,7 +674,7 @@ export class ContentController {
 
   private getTooltipHighlight(target: EventTarget | null): HTMLElement | null {
     return (target as Element | null)?.closest?.(
-      ".liucai-highlight--last[data-tooltip]",
+      '.liucai-highlight--last:is([data-has-note="true"],[data-has-tags="true"])',
     ) as HTMLElement | null;
   }
 
@@ -685,12 +685,20 @@ export class ContentController {
     return target instanceof Node && highlight.contains(target);
   }
 
-  private isHighlightColor(value: string | undefined): value is HighlightColor {
-    return value === "gold" || value === "mint" || value === "coral";
-  }
-
   private runAsync(label: string, task: () => Promise<void>): void {
     void task().catch((error) => this.reportError(label, error));
+  }
+
+  private async runReported(
+    label: string,
+    task: () => Promise<void>,
+  ): Promise<void> {
+    try {
+      await task();
+    } catch (error) {
+      this.reportError(label, error);
+      throw error;
+    }
   }
 
   private reportError(scope: string, error: unknown): void {

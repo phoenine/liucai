@@ -1,5 +1,11 @@
 import { type ReactNode, useState } from "react";
 import { continueNoteList, parseNoteBlocks } from "./noteFormat";
+import {
+  nextDeleteState,
+  runCopyAction,
+  type CopyStatus,
+  type DeleteState,
+} from "./sidebarActionState";
 import { parseTags } from "./tags";
 import type { HighlightColor, HighlightRecord } from "./types";
 
@@ -82,8 +88,8 @@ export function HighlightSidebar(props: {
   onClose: () => void;
   onLocate: (id: string) => void;
   onEdit: (record: HighlightRecord) => void;
-  onCopy: (record: HighlightRecord) => void;
-  onDelete: (id: string) => void;
+  onCopy: (record: HighlightRecord) => Promise<void>;
+  onDelete: (id: string) => Promise<void>;
 }) {
   return (
     <aside className="liucai-sidebar" aria-label="六彩划线列表">
@@ -127,31 +133,97 @@ function HighlightSidebarItem(props: {
   record: HighlightRecord;
   onLocate: () => void;
   onEdit: () => void;
-  onCopy: () => void;
-  onDelete: () => void;
+  onCopy: () => Promise<void>;
+  onDelete: () => Promise<void>;
 }) {
   const tags = Array.isArray(props.record.tags) ? props.record.tags : [];
+  const [copyStatus, setCopyStatus] = useState<CopyStatus>("idle");
+  const [deleteState, setDeleteState] = useState<DeleteState>("idle");
+  const copyLabel = {
+    idle: "复制",
+    copying: "复制中…",
+    copied: "已复制",
+    failed: "复制失败",
+  }[copyStatus];
+
+  const handleCopy = (): void => {
+    void runCopyAction(props.onCopy, setCopyStatus)
+      .catch(() => undefined)
+      .finally(() => {
+        window.setTimeout(() => setCopyStatus("idle"), 1200);
+      });
+  };
+
+  const handleDelete = (): void => {
+    setDeleteState((state) => nextDeleteState(state, "confirm"));
+    void props.onDelete().catch(() => {
+      setDeleteState((state) => nextDeleteState(state, "fail"));
+    });
+  };
+
   return (
     <article className="liucai-sidebar-item" data-color={props.record.color}>
-      <button className="liucai-sidebar-item__main" onClick={props.onLocate} title="定位到网页划线">
-        <span className="liucai-sidebar-item__dot" />
+      <button
+        aria-label={`定位第 ${props.index} 条划线`}
+        className="liucai-sidebar-item__rail"
+        onClick={props.onLocate}
+        title="定位到网页划线"
+      >
+        <span aria-hidden="true" className="liucai-sidebar-item__dot" />
         <span className="liucai-sidebar-item__index">{String(props.index).padStart(2, "0")}</span>
-        <span className="liucai-sidebar-item__text">{props.record.text}</span>
+        <span aria-hidden="true" className="liucai-sidebar-item__line" />
       </button>
-      {props.record.note.trim() ? (
-        <div className="liucai-sidebar-item__note">
-          <FormattedNote value={props.record.note.trim()} />
+      <div className="liucai-sidebar-item__content">
+        <button className="liucai-sidebar-item__main" onClick={props.onLocate} title="定位到网页划线">
+          <span className="liucai-sidebar-item__text">{props.record.text}</span>
+        </button>
+        {props.record.note.trim() ? (
+          <div className="liucai-sidebar-item__note">
+            <FormattedNote value={props.record.note.trim()} />
+          </div>
+        ) : null}
+        {tags.length > 0 ? (
+          <div className="liucai-sidebar-item__tags">
+            {tags.map((tag) => <span key={tag}>#{tag}</span>)}
+          </div>
+        ) : null}
+        <div className="liucai-sidebar-item__actions">
+          {deleteState === "idle" ? (
+            <>
+              <button onClick={props.onEdit}>编辑</button>
+              <button
+                aria-live="polite"
+                data-status={copyStatus}
+                disabled={copyStatus !== "idle"}
+                onClick={handleCopy}
+              >
+                {copyLabel}
+              </button>
+              <button
+                data-danger="true"
+                onClick={() => setDeleteState((state) => nextDeleteState(state, "request"))}
+              >
+                删除
+              </button>
+            </>
+          ) : (
+            <>
+              <button
+                disabled={deleteState === "deleting"}
+                onClick={() => setDeleteState((state) => nextDeleteState(state, "cancel"))}
+              >
+                取消
+              </button>
+              <button
+                data-danger="true"
+                disabled={deleteState === "deleting"}
+                onClick={handleDelete}
+              >
+                {deleteState === "deleting" ? "删除中…" : "确认删除"}
+              </button>
+            </>
+          )}
         </div>
-      ) : null}
-      {tags.length > 0 ? (
-        <div className="liucai-sidebar-item__tags">
-          {tags.map((tag) => <span key={tag}>#{tag}</span>)}
-        </div>
-      ) : null}
-      <div className="liucai-sidebar-item__actions">
-        <button onClick={props.onEdit}>编辑</button>
-        <button onClick={props.onCopy}>复制</button>
-        <button data-danger="true" onClick={props.onDelete}>删除</button>
       </div>
     </article>
   );

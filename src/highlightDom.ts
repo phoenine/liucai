@@ -44,31 +44,19 @@ export function applyHighlight(range: Range, highlight: HighlightRecord): HTMLEl
 
   if (spans.length > 0) {
     spans[spans.length - 1].classList.add("liucai-highlight--last");
-    syncTooltipAttr(spans[spans.length - 1], highlight);
   }
 
   return spans;
 }
 
-function syncTooltipAttr(span: HTMLElement, highlight: HighlightRecord): void {
-  const parts: string[] = [];
-  const note = highlight.note.trim();
-  const tags = Array.isArray(highlight.tags) ? highlight.tags : [];
-  if (note) parts.push(note);
-  if (tags.length > 0) parts.push(tags.map((t) => `#${t}`).join(" "));
-  span.dataset.tooltip = parts.length > 0 ? parts.join("\n\n") : "";
-}
-
-/** Update data-tooltip and hasNote/hasTags on all spans for a given record. */
+/** Update tooltip-presence flags on all spans for a given record. */
 export function updateHighlightAttributes(record: HighlightRecord): void {
   for (const span of Array.from(
     document.querySelectorAll<HTMLElement>(`.liucai-highlight[data-id="${CSS.escape(record.id)}"]`),
   )) {
     span.dataset.hasNote = String(Boolean(record.note.trim()));
     span.dataset.hasTags = String(Array.isArray(record.tags) && record.tags.length > 0);
-    if (span.classList.contains("liucai-highlight--last")) {
-      syncTooltipAttr(span, record);
-    }
+    span.removeAttribute("data-tooltip");
   }
 }
 
