@@ -4,6 +4,7 @@ import {
   EditorPopover,
   ExistingHighlightToolbar,
   HighlightSidebar,
+  HighlightTooltip,
   MiniSidebarLauncher,
   SelectionToolbar,
   type EditorFocus,
@@ -11,6 +12,7 @@ import {
 import { db, getActiveHighlights, normalizeHighlightRecord, upsertPage } from "./db";
 import { createSelectorFromRange, rangesFromSelectors } from "./domText";
 import { applyHighlight, removeHighlightFromDom, updateHighlightAttributes } from "./highlightDom";
+import { HoverRequestTracker } from "./hoverRequest";
 import { generateUuid } from "./id";
 import {
   isPageStatusRequest,
@@ -43,6 +45,7 @@ const PAGE_SETTLE_DELAY_MS = 50;
 export class ContentController {
   private readonly mounts = new ContentMounts();
   private readonly transitions = new ContentTransitionQueue();
+  private readonly hoverRequests = new HoverRequestTracker();
   private readonly hostname = location.hostname;
   private identity: PageIdentity = createPageIdentity(location.href);
   private observedHref = location.href;
@@ -117,6 +120,7 @@ export class ContentController {
     this.pageActive = false;
     this.sidebarOpen = false;
     this.currentSelectionRange = null;
+    this.hoverRequests.clear();
     this.mounts.hideAll();
     for (const span of Array.from(document.querySelectorAll<HTMLElement>(".liucai-highlight"))) {
       span.replaceWith(...Array.from(span.childNodes));
@@ -238,19 +242,38 @@ export class ContentController {
       return;
     }
 
-    const text = highlight.dataset.tooltip?.trim();
-    const color = highlight.dataset.color;
-    if (!text || !this.isHighlightColor(color)) {
+    const id = highlight.dataset.id;
+    if (!id) {
       return;
     }
 
-    this.mounts.showHighlightTooltip(highlight, text, color);
+    const request = this.hoverRequests.begin(id);
+    this.runAsync("load highlight tooltip", async () => {
+      const record = await db.highlights.get(id);
+      if (!this.hoverRequests.isCurrent(request) || !record || record.deletedAt) {
+        return;
+      }
+
+      const normalized = normalizeHighlightRecord(record);
+      if (!normalized.note.trim() && normalized.tags.length === 0) {
+        return;
+      }
+      this.mounts.showHighlightTooltip(
+        highlight,
+        normalized.color,
+        <HighlightTooltip note={normalized.note} tags={normalized.tags} />,
+      );
+    });
   };
 
   private handleHighlightPointerOut = (event: PointerEvent): void => {
     const highlight = this.getTooltipHighlight(event.target);
     if (!highlight || this.isInsideHighlight(highlight, event.relatedTarget)) {
       return;
+    }
+    const id = highlight.dataset.id;
+    if (id) {
+      this.hoverRequests.clear(id);
     }
     this.mounts.hideHighlightTooltip();
   };

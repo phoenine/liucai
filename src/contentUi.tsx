@@ -1,4 +1,5 @@
 import { type ReactNode, useState } from "react";
+import { continueNoteList, parseNoteBlocks } from "./noteFormat";
 import { parseTags } from "./tags";
 import type { HighlightColor, HighlightRecord } from "./types";
 
@@ -137,7 +138,11 @@ function HighlightSidebarItem(props: {
         <span className="liucai-sidebar-item__index">{String(props.index).padStart(2, "0")}</span>
         <span className="liucai-sidebar-item__text">{props.record.text}</span>
       </button>
-      {props.record.note.trim() ? <p className="liucai-sidebar-item__note">{props.record.note.trim()}</p> : null}
+      {props.record.note.trim() ? (
+        <div className="liucai-sidebar-item__note">
+          <FormattedNote value={props.record.note.trim()} />
+        </div>
+      ) : null}
       {tags.length > 0 ? (
         <div className="liucai-sidebar-item__tags">
           {tags.map((tag) => <span key={tag}>#{tag}</span>)}
@@ -149,6 +154,47 @@ function HighlightSidebarItem(props: {
         <button data-danger="true" onClick={props.onDelete}>删除</button>
       </div>
     </article>
+  );
+}
+
+export function HighlightTooltip(props: { note: string; tags: string[] }) {
+  return (
+    <>
+      {props.note.trim() ? (
+        <div className="liucai-highlight-tooltip__note">
+          <FormattedNote value={props.note.trim()} />
+        </div>
+      ) : null}
+      {props.tags.length > 0 ? (
+        <div className="liucai-highlight-tooltip__tags">
+          {props.tags.map((tag, index) => <span key={`${tag}-${index}`}>#{tag}</span>)}
+        </div>
+      ) : null}
+    </>
+  );
+}
+
+export function FormattedNote(props: { value: string }) {
+  return (
+    <>
+      {parseNoteBlocks(props.value).map((block, index) => {
+        if (block.type === "paragraph") {
+          return <p className="liucai-note-paragraph" key={index}>{block.lines.join("\n")}</p>;
+        }
+        if (block.type === "ordered-list") {
+          return (
+            <ol className="liucai-note-list liucai-note-list--ordered" key={index} start={block.start}>
+              {block.items.map((item, itemIndex) => <li key={itemIndex}>{item}</li>)}
+            </ol>
+          );
+        }
+        return (
+          <ul className="liucai-note-list liucai-note-list--unordered" key={index}>
+            {block.items.map((item, itemIndex) => <li key={itemIndex}>{item}</li>)}
+          </ul>
+        );
+      })}
+    </>
   );
 }
 
@@ -202,8 +248,23 @@ export function EditorPopover(props: {
       <textarea
         autoFocus={props.focus === "note"}
         value={note}
-        placeholder="写下这条高亮的想法……"
+        placeholder="写下想法；输入 1. 或 - 创建列表……"
         onChange={(event) => setNote(event.currentTarget.value)}
+        onKeyDown={(event) => {
+          if (event.key !== "Enter" || event.nativeEvent.isComposing) {
+            return;
+          }
+          const textarea = event.currentTarget;
+          const edit = continueNoteList(note, textarea.selectionStart, textarea.selectionEnd);
+          if (!edit) {
+            return;
+          }
+          event.preventDefault();
+          setNote(edit.value);
+          window.requestAnimationFrame(() => {
+            textarea.setSelectionRange(edit.caret, edit.caret);
+          });
+        }}
       />
       <label className="liucai-field-label">标签</label>
       <input

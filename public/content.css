@@ -268,6 +268,31 @@
   white-space: pre-wrap;
 }
 
+.liucai-highlight-tooltip__note {
+  all: initial;
+  background: #fff7ed;
+  border-radius: 8px;
+  color: #92400e;
+  display: block;
+  font: 12px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  padding: 6px 8px;
+}
+
+.liucai-highlight-tooltip__tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 7px;
+}
+
+.liucai-highlight-tooltip__tags span {
+  background: #eff6ff;
+  border-radius: 999px;
+  color: #2563eb;
+  font: 700 10px/1 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  padding: 4px 6px;
+}
+
 .liucai-highlight--focused {
   box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.32), 0 4px 14px rgba(37, 99, 235, 0.24) !important;
 }
@@ -489,6 +514,50 @@
   font: 12px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   margin: 7px 0 0 44px;
   padding: 6px 8px;
+}
+
+.liucai-note-paragraph,
+.liucai-note-list,
+.liucai-note-list li {
+  color: inherit;
+  font: inherit;
+}
+
+.liucai-note-paragraph {
+  display: block;
+  margin: 0;
+  white-space: pre-wrap;
+}
+
+.liucai-note-list {
+  display: block;
+  list-style-position: outside;
+  margin: 0;
+  padding-left: 20px;
+}
+
+.liucai-note-paragraph + .liucai-note-list,
+.liucai-note-list + .liucai-note-paragraph,
+.liucai-note-list + .liucai-note-list {
+  margin-top: 6px;
+}
+
+.liucai-note-list--ordered {
+  list-style-type: decimal;
+}
+
+.liucai-note-list--unordered {
+  list-style-type: disc;
+}
+
+.liucai-note-list li {
+  display: list-item;
+  list-style-type: inherit;
+  margin-top: 3px;
+}
+
+.liucai-note-list li:first-child {
+  margin-top: 0;
 }
 
 .liucai-sidebar-item__tags {

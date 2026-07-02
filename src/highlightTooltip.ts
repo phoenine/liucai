@@ -4,9 +4,9 @@ const VIEWPORT_MARGIN = 8;
 const ANCHOR_GAP = 8;
 
 export const TOOLTIP_COLORS: Record<HighlightColor, string> = {
-  gold: "#fff3ad",
-  mint: "#bdfbe9",
-  coral: "#ffd4cc",
+  gold: "#fffbe6",
+  mint: "#ecfff9",
+  coral: "#fff1ee",
 };
 
 interface AnchorRect {
