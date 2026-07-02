@@ -1,5 +1,7 @@
 import type { ReactNode } from "react";
 import { createRoot, type Root } from "react-dom/client";
+import { placeTooltip, TOOLTIP_COLORS } from "./highlightTooltip";
+import type { HighlightColor } from "./types";
 
 type MountedRoot = { root: Root; node: HTMLElement } | null;
 
@@ -8,6 +10,7 @@ export class ContentMounts {
   private popover: MountedRoot = null;
   private sidebar: MountedRoot = null;
   private miniSidebar: MountedRoot = null;
+  private highlightTooltip: HTMLElement | null = null;
 
   showToolbar(centerX: number, top: number, width: number, stateClass: string, children: ReactNode): void {
     this.hideToolbar();
@@ -62,6 +65,30 @@ export class ContentMounts {
     this.sidebar = this.renderInto(node, children);
   }
 
+  showHighlightTooltip(anchor: HTMLElement, text: string, color: HighlightColor): void {
+    this.hideHighlightTooltip();
+    const node = document.createElement("div");
+    node.className = "liucai-highlight-tooltip";
+    node.dataset.color = color;
+    node.textContent = text;
+    node.style.backgroundColor = TOOLTIP_COLORS[color];
+    node.style.visibility = "hidden";
+    document.body.append(node);
+    this.highlightTooltip = node;
+
+    const anchorRect = anchor.getBoundingClientRect();
+    const tooltipRect = node.getBoundingClientRect();
+    const position = placeTooltip(
+      anchorRect,
+      tooltipRect,
+      { width: window.innerWidth, height: window.innerHeight },
+    );
+    node.dataset.placement = position.placement;
+    node.style.left = `${position.left}px`;
+    node.style.top = `${position.top}px`;
+    node.style.visibility = "visible";
+  }
+
   hideToolbar(): void {
     this.toolbar = this.unmount(this.toolbar);
   }
@@ -78,11 +105,17 @@ export class ContentMounts {
     this.miniSidebar = this.unmount(this.miniSidebar);
   }
 
+  hideHighlightTooltip(): void {
+    this.highlightTooltip?.remove();
+    this.highlightTooltip = null;
+  }
+
   hideAll(): void {
     this.hideToolbar();
     this.hidePopover();
     this.hideSidebar();
     this.hideMiniSidebar();
+    this.hideHighlightTooltip();
   }
 
   private renderInto(node: HTMLElement, children: ReactNode): Exclude<MountedRoot, null> {

@@ -103,6 +103,8 @@ export class ContentController {
     document.addEventListener("mouseup", this.handleMouseUp, true);
     document.addEventListener("keydown", this.handleKeyDown, true);
     document.addEventListener("click", this.handleDocumentClickEvent, true);
+    document.addEventListener("pointerover", this.handleHighlightPointerOver, true);
+    document.addEventListener("pointerout", this.handleHighlightPointerOut, true);
     this.pageActive = true;
   }
 
@@ -110,6 +112,8 @@ export class ContentController {
     document.removeEventListener("mouseup", this.handleMouseUp, true);
     document.removeEventListener("keydown", this.handleKeyDown, true);
     document.removeEventListener("click", this.handleDocumentClickEvent, true);
+    document.removeEventListener("pointerover", this.handleHighlightPointerOver, true);
+    document.removeEventListener("pointerout", this.handleHighlightPointerOut, true);
     this.pageActive = false;
     this.sidebarOpen = false;
     this.currentSelectionRange = null;
@@ -226,6 +230,29 @@ export class ContentController {
 
   private handleDocumentClickEvent = (event: MouseEvent): void => {
     this.runAsync("handle highlight click", () => this.handleDocumentClick(event));
+  };
+
+  private handleHighlightPointerOver = (event: PointerEvent): void => {
+    const highlight = this.getTooltipHighlight(event.target);
+    if (!highlight || this.isInsideHighlight(highlight, event.relatedTarget)) {
+      return;
+    }
+
+    const text = highlight.dataset.tooltip?.trim();
+    const color = highlight.dataset.color;
+    if (!text || !this.isHighlightColor(color)) {
+      return;
+    }
+
+    this.mounts.showHighlightTooltip(highlight, text, color);
+  };
+
+  private handleHighlightPointerOut = (event: PointerEvent): void => {
+    const highlight = this.getTooltipHighlight(event.target);
+    if (!highlight || this.isInsideHighlight(highlight, event.relatedTarget)) {
+      return;
+    }
+    this.mounts.hideHighlightTooltip();
   };
 
   private async handleDocumentClick(event: MouseEvent): Promise<void> {
@@ -618,6 +645,23 @@ export class ContentController {
         `.liucai-highlight[data-id="${CSS.escape(id)}"]`,
       ),
     );
+  }
+
+  private getTooltipHighlight(target: EventTarget | null): HTMLElement | null {
+    return (target as Element | null)?.closest?.(
+      ".liucai-highlight--last[data-tooltip]",
+    ) as HTMLElement | null;
+  }
+
+  private isInsideHighlight(
+    highlight: HTMLElement,
+    target: EventTarget | null,
+  ): boolean {
+    return target instanceof Node && highlight.contains(target);
+  }
+
+  private isHighlightColor(value: string | undefined): value is HighlightColor {
+    return value === "gold" || value === "mint" || value === "coral";
   }
 
   private runAsync(label: string, task: () => Promise<void>): void {
