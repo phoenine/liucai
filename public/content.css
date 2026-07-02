@@ -268,6 +268,31 @@
   white-space: pre-wrap;
 }
 
+.liucai-highlight-tooltip__note {
+  all: initial;
+  background: #fff7ed;
+  border-radius: 8px;
+  color: #92400e;
+  display: block;
+  font: 12px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  padding: 6px 8px;
+}
+
+.liucai-highlight-tooltip__tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 7px;
+}
+
+.liucai-highlight-tooltip__tags span {
+  background: #eff6ff;
+  border-radius: 999px;
+  color: #2563eb;
+  font: 700 10px/1 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  padding: 4px 6px;
+}
+
 .liucai-highlight--focused {
   box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.32), 0 4px 14px rgba(37, 99, 235, 0.24) !important;
 }
@@ -436,6 +461,9 @@
   background: #ffffff;
   border-radius: 16px;
   box-shadow: 0 0 0 1px rgba(17, 24, 39, 0.06);
+  display: grid;
+  gap: 9px;
+  grid-template-columns: 28px minmax(0, 1fr);
   padding: 8px;
 }
 
@@ -447,22 +475,36 @@
   box-shadow: 0 6px 18px rgba(15, 23, 42, 0.12);
 }
 
+.liucai-sidebar-item__rail {
+  all: initial;
+  align-items: center;
+  align-self: stretch;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  gap: 5px;
+  min-height: 100%;
+  width: 28px;
+}
+
+.liucai-sidebar-item__content {
+  min-width: 0;
+}
+
 .liucai-sidebar-item__main {
   all: initial;
-  align-items: flex-start;
   color: #111827;
   cursor: pointer;
-  display: grid;
+  display: block;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  gap: 6px;
-  grid-template-columns: 10px 28px 1fr;
   width: 100%;
 }
 
 .liucai-sidebar-item__dot {
   border-radius: 999px;
   height: 10px;
-  margin-top: 5px;
+  margin-top: 2px;
   width: 10px;
 }
 
@@ -472,12 +514,31 @@
 
 .liucai-sidebar-item__index {
   color: #9ca3af;
-  font: 700 11px/1.7 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font: 700 11px/1.3 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+.liucai-sidebar-item__line {
+  border-radius: 999px;
+  flex: 1;
+  min-height: 28px;
+  opacity: 0.68;
+  width: 2px;
+}
+
+.liucai-sidebar-item[data-color="gold"] .liucai-sidebar-item__line { background: #ffea70; }
+.liucai-sidebar-item[data-color="mint"] .liucai-sidebar-item__line { background: #4df4c9; }
+.liucai-sidebar-item[data-color="coral"] .liucai-sidebar-item__line { background: #ffaFA1; }
+
+.liucai-sidebar-item__rail:hover .liucai-sidebar-item__line {
+  opacity: 1;
 }
 
 .liucai-sidebar-item__text {
   display: block;
   font: 13px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
 }
 
 .liucai-sidebar-item__note {
@@ -487,15 +548,63 @@
   color: #92400e;
   display: block;
   font: 12px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  margin: 7px 0 0 44px;
+  margin: 7px 0 0;
   padding: 6px 8px;
+}
+
+.liucai-note-paragraph,
+.liucai-note-list,
+.liucai-note-list li {
+  color: inherit;
+  font: inherit;
+}
+
+.liucai-note-paragraph {
+  display: block;
+  margin: 0;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.liucai-note-list {
+  display: block;
+  list-style-position: outside;
+  margin: 0;
+  padding-left: 20px;
+}
+
+.liucai-note-paragraph + .liucai-note-list,
+.liucai-note-list + .liucai-note-paragraph,
+.liucai-note-list + .liucai-note-list {
+  margin-top: 6px;
+}
+
+.liucai-note-list--ordered {
+  list-style-type: decimal;
+}
+
+.liucai-note-list--unordered {
+  list-style-type: disc;
+}
+
+.liucai-note-list li {
+  display: list-item;
+  list-style-type: inherit;
+  margin-top: 3px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.liucai-note-list li:first-child {
+  margin-top: 0;
 }
 
 .liucai-sidebar-item__tags {
   display: flex;
   flex-wrap: wrap;
   gap: 4px;
-  margin: 7px 0 0 44px;
+  margin: 7px 0 0;
 }
 
 .liucai-sidebar-item__tags span {
@@ -524,6 +633,23 @@
 
 .liucai-sidebar-item__actions button:hover {
   background: #f3f4f6;
+}
+
+.liucai-sidebar-item__actions button:disabled {
+  cursor: default;
+  opacity: 0.65;
+}
+
+.liucai-sidebar-item__actions button:disabled:hover {
+  background: transparent;
+}
+
+.liucai-sidebar-item__actions button[data-status="copied"] {
+  color: #2563eb;
+}
+
+.liucai-sidebar-item__actions button[data-status="failed"] {
+  color: #dc2626;
 }
 
 .liucai-sidebar-item__actions button[data-danger="true"]:hover {

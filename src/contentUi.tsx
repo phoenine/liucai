@@ -1,4 +1,11 @@
 import { type ReactNode, useState } from "react";
+import { continueNoteList, parseNoteBlocks } from "./noteFormat";
+import {
+  nextDeleteState,
+  runCopyAction,
+  type CopyStatus,
+  type DeleteState,
+} from "./sidebarActionState";
 import { parseTags } from "./tags";
 import type { HighlightColor, HighlightRecord } from "./types";
 
@@ -81,8 +88,8 @@ export function HighlightSidebar(props: {
   onClose: () => void;
   onLocate: (id: string) => void;
   onEdit: (record: HighlightRecord) => void;
-  onCopy: (record: HighlightRecord) => void;
-  onDelete: (id: string) => void;
+  onCopy: (record: HighlightRecord) => Promise<void>;
+  onDelete: (id: string) => Promise<void>;
 }) {
   return (
     <aside className="liucai-sidebar" aria-label="六彩划线列表">
@@ -126,29 +133,140 @@ function HighlightSidebarItem(props: {
   record: HighlightRecord;
   onLocate: () => void;
   onEdit: () => void;
-  onCopy: () => void;
-  onDelete: () => void;
+  onCopy: () => Promise<void>;
+  onDelete: () => Promise<void>;
 }) {
   const tags = Array.isArray(props.record.tags) ? props.record.tags : [];
+  const [copyStatus, setCopyStatus] = useState<CopyStatus>("idle");
+  const [deleteState, setDeleteState] = useState<DeleteState>("idle");
+  const copyLabel = {
+    idle: "复制",
+    copying: "复制中…",
+    copied: "已复制",
+    failed: "复制失败",
+  }[copyStatus];
+
+  const handleCopy = (): void => {
+    void runCopyAction(props.onCopy, setCopyStatus)
+      .catch(() => undefined)
+      .finally(() => {
+        window.setTimeout(() => setCopyStatus("idle"), 1200);
+      });
+  };
+
+  const handleDelete = (): void => {
+    setDeleteState((state) => nextDeleteState(state, "confirm"));
+    void props.onDelete().catch(() => {
+      setDeleteState((state) => nextDeleteState(state, "fail"));
+    });
+  };
+
   return (
     <article className="liucai-sidebar-item" data-color={props.record.color}>
-      <button className="liucai-sidebar-item__main" onClick={props.onLocate} title="定位到网页划线">
-        <span className="liucai-sidebar-item__dot" />
+      <button
+        aria-label={`定位第 ${props.index} 条划线`}
+        className="liucai-sidebar-item__rail"
+        onClick={props.onLocate}
+        title="定位到网页划线"
+      >
+        <span aria-hidden="true" className="liucai-sidebar-item__dot" />
         <span className="liucai-sidebar-item__index">{String(props.index).padStart(2, "0")}</span>
-        <span className="liucai-sidebar-item__text">{props.record.text}</span>
+        <span aria-hidden="true" className="liucai-sidebar-item__line" />
       </button>
-      {props.record.note.trim() ? <p className="liucai-sidebar-item__note">{props.record.note.trim()}</p> : null}
-      {tags.length > 0 ? (
-        <div className="liucai-sidebar-item__tags">
-          {tags.map((tag) => <span key={tag}>#{tag}</span>)}
+      <div className="liucai-sidebar-item__content">
+        <button className="liucai-sidebar-item__main" onClick={props.onLocate} title="定位到网页划线">
+          <span className="liucai-sidebar-item__text">{props.record.text}</span>
+        </button>
+        {props.record.note.trim() ? (
+          <div className="liucai-sidebar-item__note">
+            <FormattedNote value={props.record.note.trim()} />
+          </div>
+        ) : null}
+        {tags.length > 0 ? (
+          <div className="liucai-sidebar-item__tags">
+            {tags.map((tag) => <span key={tag}>#{tag}</span>)}
+          </div>
+        ) : null}
+        <div className="liucai-sidebar-item__actions">
+          {deleteState === "idle" ? (
+            <>
+              <button onClick={props.onEdit}>编辑</button>
+              <button
+                aria-live="polite"
+                data-status={copyStatus}
+                disabled={copyStatus !== "idle"}
+                onClick={handleCopy}
+              >
+                {copyLabel}
+              </button>
+              <button
+                data-danger="true"
+                onClick={() => setDeleteState((state) => nextDeleteState(state, "request"))}
+              >
+                删除
+              </button>
+            </>
+          ) : (
+            <>
+              <button
+                disabled={deleteState === "deleting"}
+                onClick={() => setDeleteState((state) => nextDeleteState(state, "cancel"))}
+              >
+                取消
+              </button>
+              <button
+                data-danger="true"
+                disabled={deleteState === "deleting"}
+                onClick={handleDelete}
+              >
+                {deleteState === "deleting" ? "删除中…" : "确认删除"}
+              </button>
+            </>
+          )}
         </div>
-      ) : null}
-      <div className="liucai-sidebar-item__actions">
-        <button onClick={props.onEdit}>编辑</button>
-        <button onClick={props.onCopy}>复制</button>
-        <button data-danger="true" onClick={props.onDelete}>删除</button>
       </div>
     </article>
+  );
+}
+
+export function HighlightTooltip(props: { note: string; tags: string[] }) {
+  return (
+    <>
+      {props.note.trim() ? (
+        <div className="liucai-highlight-tooltip__note">
+          <FormattedNote value={props.note.trim()} />
+        </div>
+      ) : null}
+      {props.tags.length > 0 ? (
+        <div className="liucai-highlight-tooltip__tags">
+          {props.tags.map((tag, index) => <span key={`${tag}-${index}`}>#{tag}</span>)}
+        </div>
+      ) : null}
+    </>
+  );
+}
+
+export function FormattedNote(props: { value: string }) {
+  return (
+    <>
+      {parseNoteBlocks(props.value).map((block, index) => {
+        if (block.type === "paragraph") {
+          return <p className="liucai-note-paragraph" key={index}>{block.lines.join("\n")}</p>;
+        }
+        if (block.type === "ordered-list") {
+          return (
+            <ol className="liucai-note-list liucai-note-list--ordered" key={index} start={block.start}>
+              {block.items.map((item, itemIndex) => <li key={itemIndex}>{item}</li>)}
+            </ol>
+          );
+        }
+        return (
+          <ul className="liucai-note-list liucai-note-list--unordered" key={index}>
+            {block.items.map((item, itemIndex) => <li key={itemIndex}>{item}</li>)}
+          </ul>
+        );
+      })}
+    </>
   );
 }
 
@@ -202,8 +320,23 @@ export function EditorPopover(props: {
       <textarea
         autoFocus={props.focus === "note"}
         value={note}
-        placeholder="写下这条高亮的想法……"
+        placeholder="写下想法；输入 1. 或 - 创建列表……"
         onChange={(event) => setNote(event.currentTarget.value)}
+        onKeyDown={(event) => {
+          if (event.key !== "Enter" || event.nativeEvent.isComposing) {
+            return;
+          }
+          const textarea = event.currentTarget;
+          const edit = continueNoteList(note, textarea.selectionStart, textarea.selectionEnd);
+          if (!edit) {
+            return;
+          }
+          event.preventDefault();
+          setNote(edit.value);
+          window.requestAnimationFrame(() => {
+            textarea.setSelectionRange(edit.caret, edit.caret);
+          });
+        }}
       />
       <label className="liucai-field-label">标签</label>
       <input

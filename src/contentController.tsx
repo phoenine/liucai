@@ -4,6 +4,7 @@ import {
   EditorPopover,
   ExistingHighlightToolbar,
   HighlightSidebar,
+  HighlightTooltip,
   MiniSidebarLauncher,
   SelectionToolbar,
   type EditorFocus,
@@ -11,12 +12,14 @@ import {
 import { db, getActiveHighlights, normalizeHighlightRecord, upsertPage } from "./db";
 import { createSelectorFromRange, rangesFromSelectors } from "./domText";
 import { applyHighlight, removeHighlightFromDom, updateHighlightAttributes } from "./highlightDom";
+import { HoverRequestTracker } from "./hoverRequest";
 import { generateUuid } from "./id";
 import {
   isPageStatusRequest,
   isSetSiteDisabledRequest,
   type PageStatus,
 } from "./messages";
+import { getRangeDisplayText } from "./rangeDisplayText";
 import { isHostnameDisabled, setHostnameDisabled } from "./sitePreferences";
 import type { HighlightColor, HighlightRecord, PageRecord } from "./types";
 import {
@@ -43,6 +46,7 @@ const PAGE_SETTLE_DELAY_MS = 50;
 export class ContentController {
   private readonly mounts = new ContentMounts();
   private readonly transitions = new ContentTransitionQueue();
+  private readonly hoverRequests = new HoverRequestTracker();
   private readonly hostname = location.hostname;
   private identity: PageIdentity = createPageIdentity(location.href);
   private observedHref = location.href;
@@ -117,6 +121,7 @@ export class ContentController {
     this.pageActive = false;
     this.sidebarOpen = false;
     this.currentSelectionRange = null;
+    this.hoverRequests.clear();
     this.mounts.hideAll();
     for (const span of Array.from(document.querySelectorAll<HTMLElement>(".liucai-highlight"))) {
       span.replaceWith(...Array.from(span.childNodes));
@@ -238,19 +243,38 @@ export class ContentController {
       return;
     }
 
-    const text = highlight.dataset.tooltip?.trim();
-    const color = highlight.dataset.color;
-    if (!text || !this.isHighlightColor(color)) {
+    const id = highlight.dataset.id;
+    if (!id) {
       return;
     }
 
-    this.mounts.showHighlightTooltip(highlight, text, color);
+    const request = this.hoverRequests.begin(id);
+    this.runAsync("load highlight tooltip", async () => {
+      const record = await db.highlights.get(id);
+      if (!this.hoverRequests.isCurrent(request) || !record || record.deletedAt) {
+        return;
+      }
+
+      const normalized = normalizeHighlightRecord(record);
+      if (!normalized.note.trim() && normalized.tags.length === 0) {
+        return;
+      }
+      this.mounts.showHighlightTooltip(
+        highlight,
+        normalized.color,
+        <HighlightTooltip note={normalized.note} tags={normalized.tags} />,
+      );
+    });
   };
 
   private handleHighlightPointerOut = (event: PointerEvent): void => {
     const highlight = this.getTooltipHighlight(event.target);
     if (!highlight || this.isInsideHighlight(highlight, event.relatedTarget)) {
       return;
+    }
+    const id = highlight.dataset.id;
+    if (id) {
+      this.hoverRequests.clear(id);
     }
     this.mounts.hideHighlightTooltip();
   };
@@ -422,11 +446,11 @@ export class ContentController {
         }}
         onLocate={(id) => this.locateHighlight(id)}
         onEdit={(record) => this.editHighlightFromSidebar(record)}
-        onCopy={(record) => this.runAsync(
+        onCopy={(record) => this.runReported(
           "copy sidebar highlight text",
           () => this.copyHighlightText(record),
         )}
-        onDelete={(id) => this.runAsync(
+        onDelete={(id) => this.runReported(
           "delete sidebar highlight",
           () => this.deleteHighlight(id),
         )}
@@ -458,6 +482,7 @@ export class ContentController {
     if (!range) return;
     const selector = createSelectorFromRange(range);
     if (!selector) return;
+    const displayText = getRangeDisplayText(range);
 
     const page = await this.getCurrentPage();
     const now = new Date().toISOString();
@@ -465,7 +490,7 @@ export class ContentController {
       id: generateUuid(),
       pageId: page.id,
       canonicalUrl: this.identity.canonicalUrl,
-      text: selector.exact,
+      text: displayText || selector.exact,
       color,
       note: "",
       tags: [],
@@ -649,7 +674,7 @@ export class ContentController {
 
   private getTooltipHighlight(target: EventTarget | null): HTMLElement | null {
     return (target as Element | null)?.closest?.(
-      ".liucai-highlight--last[data-tooltip]",
+      '.liucai-highlight--last:is([data-has-note="true"],[data-has-tags="true"])',
     ) as HTMLElement | null;
   }
 
@@ -660,12 +685,20 @@ export class ContentController {
     return target instanceof Node && highlight.contains(target);
   }
 
-  private isHighlightColor(value: string | undefined): value is HighlightColor {
-    return value === "gold" || value === "mint" || value === "coral";
-  }
-
   private runAsync(label: string, task: () => Promise<void>): void {
     void task().catch((error) => this.reportError(label, error));
+  }
+
+  private async runReported(
+    label: string,
+    task: () => Promise<void>,
+  ): Promise<void> {
+    try {
+      await task();
+    } catch (error) {
+      this.reportError(label, error);
+      throw error;
+    }
   }
 
   private reportError(scope: string, error: unknown): void {

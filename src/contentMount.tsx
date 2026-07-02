@@ -10,7 +10,7 @@ export class ContentMounts {
   private popover: MountedRoot = null;
   private sidebar: MountedRoot = null;
   private miniSidebar: MountedRoot = null;
-  private highlightTooltip: HTMLElement | null = null;
+  private highlightTooltip: MountedRoot = null;
 
   showToolbar(centerX: number, top: number, width: number, stateClass: string, children: ReactNode): void {
     this.hideToolbar();
@@ -58,35 +58,41 @@ export class ContentMounts {
   }
 
   renderSidebar(children: ReactNode): void {
-    this.hideSidebar();
+    if (this.sidebar) {
+      this.sidebar.root.render(children);
+      return;
+    }
     const node = document.createElement("div");
     node.className = "liucai-sidebar-root";
     document.body.append(node);
     this.sidebar = this.renderInto(node, children);
   }
 
-  showHighlightTooltip(anchor: HTMLElement, text: string, color: HighlightColor): void {
+  showHighlightTooltip(anchor: HTMLElement, color: HighlightColor, children: ReactNode): void {
     this.hideHighlightTooltip();
     const node = document.createElement("div");
     node.className = "liucai-highlight-tooltip";
     node.dataset.color = color;
-    node.textContent = text;
     node.style.backgroundColor = TOOLTIP_COLORS[color];
     node.style.visibility = "hidden";
     document.body.append(node);
-    this.highlightTooltip = node;
+    const mounted = this.renderInto(node, children);
+    this.highlightTooltip = mounted;
 
-    const anchorRect = anchor.getBoundingClientRect();
-    const tooltipRect = node.getBoundingClientRect();
-    const position = placeTooltip(
-      anchorRect,
-      tooltipRect,
-      { width: window.innerWidth, height: window.innerHeight },
-    );
-    node.dataset.placement = position.placement;
-    node.style.left = `${position.left}px`;
-    node.style.top = `${position.top}px`;
-    node.style.visibility = "visible";
+    window.requestAnimationFrame(() => {
+      if (this.highlightTooltip !== mounted || !node.isConnected || !anchor.isConnected) {
+        return;
+      }
+      const position = placeTooltip(
+        anchor.getBoundingClientRect(),
+        node.getBoundingClientRect(),
+        { width: window.innerWidth, height: window.innerHeight },
+      );
+      node.dataset.placement = position.placement;
+      node.style.left = `${position.left}px`;
+      node.style.top = `${position.top}px`;
+      node.style.visibility = "visible";
+    });
   }
 
   hideToolbar(): void {
@@ -106,8 +112,7 @@ export class ContentMounts {
   }
 
   hideHighlightTooltip(): void {
-    this.highlightTooltip?.remove();
-    this.highlightTooltip = null;
+    this.highlightTooltip = this.unmount(this.highlightTooltip);
   }
 
   hideAll(): void {
