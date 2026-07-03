@@ -94,16 +94,19 @@ export function HighlightSidebar(props: {
   return (
     <aside className="liucai-sidebar" aria-label="六彩划线列表">
       <header className="liucai-sidebar__header">
-        <div>
-          <div className="liucai-sidebar__eyebrow">当前页面</div>
+        <div className="liucai-sidebar__heading">
           <h2>划线列表</h2>
+          <span className="liucai-sidebar__count">{props.records.length} 条</span>
         </div>
         <button className="liucai-sidebar__close" title="收起" onClick={props.onClose}>{icons.close}</button>
       </header>
-      <div className="liucai-sidebar__summary">
-        <span>{props.records.length} 条划线</span>
-        <span>{props.pageTitle || "未命名页面"}</span>
+      <div
+        className="liucai-sidebar__page-title"
+        title={props.pageTitle || "未命名页面"}
+      >
+        {props.pageTitle || "未命名页面"}
       </div>
+      <div aria-hidden="true" className="liucai-sidebar__divider" />
       {props.records.length === 0 ? (
         <div className="liucai-sidebar__empty">
           <strong>还没有划线</strong>

@@ -377,13 +377,14 @@
   align-items: center;
   display: flex;
   justify-content: space-between;
-  padding: 14px 14px 8px;
+  padding: 14px 14px 6px;
 }
 
-.liucai-sidebar__eyebrow {
-  color: #6b7280;
-  font: 700 11px/1.2 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  letter-spacing: 0.04em;
+.liucai-sidebar__heading {
+  align-items: center;
+  display: flex;
+  gap: 8px;
+  min-width: 0;
 }
 
 .liucai-sidebar__header h2 {
@@ -391,7 +392,14 @@
   color: #111827;
   display: block;
   font: 800 16px/1.3 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  margin-top: 2px;
+}
+
+.liucai-sidebar__count {
+  background: #eef2ff;
+  border-radius: 999px;
+  color: #4338ca;
+  font: 700 11px/1 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  padding: 4px 7px;
 }
 
 .liucai-sidebar__close {
@@ -416,18 +424,20 @@
   width: 20px;
 }
 
-.liucai-sidebar__summary {
+.liucai-sidebar__page-title {
   color: #6b7280;
-  display: grid;
+  display: block;
   font: 12px/1.35 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  gap: 4px;
-  padding: 0 14px 10px;
-}
-
-.liucai-sidebar__summary span:last-child {
   overflow: hidden;
+  padding: 0 14px 9px;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.liucai-sidebar__divider {
+  background: linear-gradient(90deg, transparent, #dbe4f0 12%, #dbe4f0 88%, transparent);
+  flex: 0 0 1px;
+  margin: 0 10px 3px;
 }
 
 .liucai-sidebar__list {
@@ -604,7 +614,7 @@
   display: flex;
   flex-wrap: wrap;
   gap: 4px;
-  margin: 7px 0 0;
+  margin: 11px 0 0;
 }
 
 .liucai-sidebar-item__tags span {

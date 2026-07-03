@@ -19,6 +19,7 @@ import {
   isSetSiteDisabledRequest,
   type PageStatus,
 } from "./messages";
+import { formatObsidianHighlight } from "./obsidianExport";
 import { getRangeDisplayText } from "./rangeDisplayText";
 import { isHostnameDisabled, setHostnameDisabled } from "./sitePreferences";
 import type { HighlightColor, HighlightRecord, PageRecord } from "./types";
@@ -568,7 +569,7 @@ export class ContentController {
   }
 
   private async copyHighlightText(record: HighlightRecord): Promise<void> {
-    await this.copyText(record.text);
+    await this.copyText(formatObsidianHighlight(record, document.title));
   }
 
   private async copyText(text: string): Promise<void> {

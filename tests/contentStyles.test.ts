@@ -101,3 +101,35 @@ test("uses the selected narrow rail layout for sidebar cards", async () => {
   assert.doesNotMatch(noteRule, /44px/);
   assert.doesNotMatch(tagsRule, /44px/);
 });
+
+test("uses a compact page heading and divider above the highlight list", async () => {
+  const css = await readFile(new URL("../public/content.css", import.meta.url), "utf8");
+  const headingRule = css.match(/\.liucai-sidebar__heading\s*\{[^}]*\}/s)?.[0];
+  const countRule = css.match(/\.liucai-sidebar__count\s*\{[^}]*\}/s)?.[0];
+  const titleRule = css.match(/\.liucai-sidebar__page-title\s*\{[^}]*\}/s)?.[0];
+  const dividerRule = css.match(/\.liucai-sidebar__divider\s*\{[^}]*\}/s)?.[0];
+
+  assert.ok(headingRule);
+  assert.ok(countRule);
+  assert.ok(titleRule);
+  assert.ok(dividerRule);
+  assert.match(headingRule, /display:\s*flex;/);
+  assert.match(countRule, /border-radius:\s*999px;/);
+  assert.match(titleRule, /text-overflow:\s*ellipsis;/);
+  assert.match(dividerRule, /linear-gradient/);
+});
+
+test("keeps the original vertical rhythm between note, tags, and card actions", async () => {
+  const css = await readFile(new URL("../public/content.css", import.meta.url), "utf8");
+  const noteRule = css.match(/\.liucai-sidebar-item__note\s*\{[^}]*\}/s)?.[0];
+  const tagsRule = css.match(/\.liucai-sidebar-item__tags\s*\{[^}]*\}/s)?.[0];
+  const actionsRule = css.match(/\.liucai-sidebar-item__actions\s*\{[^}]*\}/s)?.[0];
+
+  assert.ok(noteRule);
+  assert.ok(tagsRule);
+  assert.ok(actionsRule);
+  assert.match(noteRule, /margin:\s*7px 0 0;/);
+  assert.match(tagsRule, /margin:\s*11px 0 0;/);
+  assert.match(actionsRule, /margin-top:\s*8px;/);
+  assert.doesNotMatch(css, /\.liucai-sidebar-item__footer\s*\{/);
+});
