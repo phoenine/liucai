@@ -19,7 +19,11 @@ import {
   isSetSiteDisabledRequest,
   type PageStatus,
 } from "./messages";
-import { formatObsidianHighlight } from "./obsidianExport";
+import {
+  createObsidianExportFilename,
+  formatObsidianHighlight,
+  formatObsidianPageExport,
+} from "./obsidianExport";
 import { getRangeDisplayText } from "./rangeDisplayText";
 import { isHostnameDisabled, setHostnameDisabled } from "./sitePreferences";
 import type { HighlightColor, HighlightRecord, PageRecord } from "./types";
@@ -445,6 +449,7 @@ export class ContentController {
           this.mounts.hideSidebar();
           this.runAsync("refresh mini sidebar", () => this.refreshSidebarData());
         }}
+        onExport={() => this.exportHighlights(records)}
         onLocate={(id) => this.locateHighlight(id)}
         onEdit={(record) => this.editHighlightFromSidebar(record)}
         onCopy={(record) => this.runReported(
@@ -570,6 +575,37 @@ export class ContentController {
 
   private async copyHighlightText(record: HighlightRecord): Promise<void> {
     await this.copyText(formatObsidianHighlight(record, document.title));
+  }
+
+  private async exportHighlights(records: HighlightRecord[]): Promise<void> {
+    if (records.length === 0) {
+      return;
+    }
+
+    const markdown = formatObsidianPageExport({
+      pageTitle: document.title,
+      canonicalUrl: this.identity.canonicalUrl,
+      highlights: records,
+    });
+    this.downloadTextFile(
+      createObsidianExportFilename(document.title),
+      markdown,
+      "text/markdown;charset=utf-8",
+    );
+  }
+
+  private downloadTextFile(filename: string, text: string, type: string): void {
+    const blob = new Blob([text], { type });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = filename;
+    link.rel = "noopener";
+    link.style.display = "none";
+    document.body.append(link);
+    link.click();
+    link.remove();
+    window.setTimeout(() => URL.revokeObjectURL(url), 0);
   }
 
   private async copyText(text: string): Promise<void> {

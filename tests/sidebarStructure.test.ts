@@ -23,6 +23,26 @@ test("sidebar presents list title and count before the secondary page title", as
   assert.doesNotMatch(sidebar, /当前页面/);
 });
 
+test("sidebar presents export action below page title while close remains in the header", async () => {
+  const source = await readFile(new URL("../src/contentUi.tsx", import.meta.url), "utf8");
+  const sidebar = source.slice(
+    source.indexOf("export function HighlightSidebar"),
+    source.indexOf("function HighlightSidebarItem"),
+  );
+
+  const closeIndex = sidebar.indexOf("liucai-sidebar__close");
+  const pageTitleIndex = sidebar.indexOf("liucai-sidebar__page-title");
+  const exportPanelIndex = sidebar.indexOf("liucai-sidebar__export");
+  const exportLabelIndex = sidebar.indexOf("导出 Obsidian Markdown");
+  const dividerIndex = sidebar.indexOf("liucai-sidebar__divider");
+
+  assert.ok(closeIndex >= 0);
+  assert.ok(pageTitleIndex > closeIndex);
+  assert.ok(exportPanelIndex > pageTitleIndex);
+  assert.ok(exportLabelIndex > exportPanelIndex);
+  assert.ok(dividerIndex > exportLabelIndex);
+});
+
 test("sidebar card keeps tags above actions without an extra footer wrapper", async () => {
   const source = await readFile(new URL("../src/contentUi.tsx", import.meta.url), "utf8");
   const item = source.slice(

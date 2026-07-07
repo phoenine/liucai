@@ -1,7 +1,11 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
-import { formatObsidianHighlight } from "../src/obsidianExport.ts";
+import {
+  createObsidianExportFilename,
+  formatObsidianHighlight,
+  formatObsidianPageExport,
+} from "../src/obsidianExport.ts";
 import type { HighlightColor, HighlightRecord } from "../src/types.ts";
 
 function makeRecord(overrides: Partial<HighlightRecord> = {}): HighlightRecord {
@@ -116,5 +120,124 @@ test("uses the Obsidian formatter for sidebar copies", async () => {
   assert.match(
     source,
     /this\.copyText\(formatObsidianHighlight\(record,\s*document\.title\)\)/,
+  );
+});
+
+test("formats a page export using the Obsidian clipping template", () => {
+  const exported = formatObsidianPageExport({
+    pageTitle: "万字保姆级Pandas核心知识操作大全",
+    canonicalUrl: "https://bbs.huaweicloud.com/blogs/337034",
+    highlights: [
+      makeRecord({
+        id: "highlight-1",
+        canonicalUrl: "https://bbs.huaweicloud.com/blogs/337034",
+        text: "用到pandas做数据处理和分析，特意总结了",
+        color: "gold",
+        note: "简单测试下",
+        tags: ["策四"],
+      }),
+      makeRecord({
+        id: "highlight-2",
+        canonicalUrl: "https://bbs.huaweicloud.com/blogs/337034",
+        text: "计算字符串长",
+        color: "gold",
+        note: "再来一个检查",
+        tags: ["测试"],
+      }),
+    ],
+    exportedAt: new Date("2026-04-13T13:57:00+08:00"),
+  });
+
+  assert.equal(
+    exported,
+    [
+      "---",
+      "创建时间: 2026-04-13 13:57",
+      "划线数量: 2",
+      "tags:",
+      "  - 策四",
+      "  - 测试",
+      "原文链接: https://bbs.huaweicloud.com/blogs/337034",
+      "---",
+      "# 万字保姆级Pandas核心知识操作大全",
+      "",
+      "> [阅读原文](https://bbs.huaweicloud.com/blogs/337034)",
+      "",
+      "---",
+      "",
+      "> [!quote] 🟡 网页摘录 · [万字保姆级Pandas核心知识操作大全](https://bbs.huaweicloud.com/blogs/337034)",
+      ">",
+      "> *用到pandas做数据处理和分析，特意总结了*",
+      ">",
+      "> ---",
+      ">",
+      "> **批注**",
+      ">",
+      "> 简单测试下",
+      ">",
+      "> **标签：** #策四",
+      "",
+      "---",
+      "",
+      "> [!quote] 🟡 网页摘录 · [万字保姆级Pandas核心知识操作大全](https://bbs.huaweicloud.com/blogs/337034)",
+      ">",
+      "> *计算字符串长*",
+      ">",
+      "> ---",
+      ">",
+      "> **批注**",
+      ">",
+      "> 再来一个检查",
+      ">",
+      "> **标签：** #测试",
+      "",
+      "---",
+    ].join("\n"),
+  );
+});
+
+test("deduplicates and normalizes highlight tags in page export frontmatter", () => {
+  const exported = formatObsidianPageExport({
+    pageTitle: "Tag Test",
+    canonicalUrl: "https://example.com/tags",
+    highlights: [
+      makeRecord({ tags: ["#机器 学习", "Java"] }),
+      makeRecord({ id: "highlight-2", tags: ["机器-学习", ""] }),
+    ],
+    exportedAt: new Date("2026-04-13T13:57:00+08:00"),
+  });
+
+  assert.match(
+    exported,
+    /^tags:\n  - 机器-学习\n  - Java\n原文链接:/m,
+  );
+});
+
+test("omits title from frontmatter while keeping page headings", () => {
+  const exported = formatObsidianPageExport({
+    pageTitle: "sqlpage/SQLPage: Fast SQL-only data application builder. Automatically build a UI on top of SQL queries.",
+    canonicalUrl: "https://github.com/sqlpage/SQLPage",
+    highlights: [
+      makeRecord({
+        canonicalUrl: "https://github.com/sqlpage/SQLPage",
+        tags: ["new", "needs[quote]"],
+      }),
+    ],
+    exportedAt: new Date("2026-07-07T11:23:00+08:00"),
+  });
+
+  assert.doesNotMatch(exported, /^标题:/m);
+  assert.match(exported, /^# sqlpage\/SQLPage: Fast SQL-only data application builder\. Automatically build a UI on top of SQL queries\.$/m);
+  assert.match(exported, /^  - "needs\[quote\]"\n原文链接:/m);
+});
+
+test("creates a safe clipping export filename", () => {
+  assert.equal(
+    createObsidianExportFilename("  React/TypeScript: Hooks? *Guide*  "),
+    "【摘录】React-TypeScript Hooks Guide.md",
+  );
+  assert.equal(
+    createObsidianExportFilename(""),
+    "【摘录】未命名页面.md",
   );
 });
