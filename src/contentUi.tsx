@@ -86,11 +86,28 @@ export function HighlightSidebar(props: {
   pageTitle: string;
   records: HighlightRecord[];
   onClose: () => void;
+  onExport: () => Promise<void>;
   onLocate: (id: string) => void;
   onEdit: (record: HighlightRecord) => void;
   onCopy: (record: HighlightRecord) => Promise<void>;
   onDelete: (id: string) => Promise<void>;
 }) {
+  const [exportStatus, setExportStatus] = useState<CopyStatus>("idle");
+  const exportLabel = {
+    idle: "导出",
+    copying: "导出中…",
+    copied: "已导出",
+    failed: "导出失败",
+  }[exportStatus];
+
+  const handleExport = (): void => {
+    void runCopyAction(props.onExport, setExportStatus)
+      .catch(() => undefined)
+      .finally(() => {
+        window.setTimeout(() => setExportStatus("idle"), 1400);
+      });
+  };
+
   return (
     <aside className="liucai-sidebar" aria-label="六彩划线列表">
       <header className="liucai-sidebar__header">
@@ -105,6 +122,22 @@ export function HighlightSidebar(props: {
         title={props.pageTitle || "未命名页面"}
       >
         {props.pageTitle || "未命名页面"}
+      </div>
+      <div className="liucai-sidebar__export">
+        <div className="liucai-sidebar__export-copy">
+          <strong>导出 Obsidian Markdown</strong>
+          <span>包含 Frontmatter、原文链接、批注和标签</span>
+        </div>
+        <button
+          aria-live="polite"
+          data-status={exportStatus}
+          disabled={exportStatus !== "idle" || props.records.length === 0}
+          onClick={handleExport}
+          type="button"
+        >
+          {icons.download}
+          <span>{exportLabel}</span>
+        </button>
       </div>
       <div aria-hidden="true" className="liucai-sidebar__divider" />
       {props.records.length === 0 ? (
@@ -388,5 +421,8 @@ const icons = {
   ),
   close: (
     <svg {...iconProps}><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg>
+  ),
+  download: (
+    <svg {...iconProps}><path d="M12 3v12" /><path d="m7 10 5 5 5-5" /><path d="M5 21h14" /></svg>
   ),
 };
