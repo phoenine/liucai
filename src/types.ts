@@ -31,3 +31,42 @@ export interface HighlightRecord {
   updatedAt: string;
   deletedAt?: string;
 }
+
+export type SyncEntityType = "page" | "highlight";
+export type SyncOperation = "upsert" | "delete";
+
+export interface OutboxMutation {
+  mutationId: string;
+  entityType: SyncEntityType;
+  entityId: string;
+  operation: SyncOperation;
+  payload: PageRecord | HighlightRecord;
+  createdAt: string;
+  retryCount: number;
+  nextAttemptAt?: string;
+  lastError?: string;
+}
+
+export interface SyncStateRecord {
+  key: string;
+  cursor: number;
+  userId?: string;
+  lastSyncedAt?: string;
+  lastError?: string;
+}
+
+export interface RemoteChange {
+  sequence: number;
+  entityType: SyncEntityType;
+  entityId: string;
+  operation: SyncOperation;
+  revision: number;
+  payload: PageRecord | HighlightRecord;
+}
+
+export interface SyncBatchResult {
+  acknowledgedMutationIds: string[];
+  changes: RemoteChange[];
+  nextCursor: number;
+  hasMore: boolean;
+}
