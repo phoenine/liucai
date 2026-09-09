@@ -76,7 +76,7 @@ npm run package
 
 [CI workflow](.github/workflows/ci-release.yml) 会在 `main`、`dev`、Pull Request 和手动运行时执行测试、类型检查、构建与打包，并保存 14 天的 Actions Artifact。
 
-推送与 `package.json` 版本一致的标签，例如 `v0.1.0`，CI 会自动创建或更新 GitHub Release，并上传插件 ZIP。
+推送与 `package.json` 版本一致的标签，例如 `v1.0.0` 或 `1.0.0`，CI 会自动创建或更新 GitHub Release，并上传插件 ZIP。ZIP 位于 Release 的 **Assets**，不会显示在 GitHub **Packages** 区域。
 
 发布带云同步的版本前，在仓库 **Settings → Secrets and variables → Actions → Variables** 中添加：
 

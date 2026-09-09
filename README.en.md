@@ -76,7 +76,7 @@ npm run package
 
 The [CI workflow](.github/workflows/ci-release.yml) runs tests, type checking, builds, and packaging on `main`, `dev`, pull requests, and manual runs. It retains the resulting Actions Artifact for 14 days.
 
-Pushing a tag that matches the version in `package.json`, such as `v0.1.0`, automatically creates or updates a GitHub Release and uploads the extension ZIP.
+Pushing a tag that matches the version in `package.json`, such as `v1.0.0` or `1.0.0`, automatically creates or updates a GitHub Release and uploads the extension ZIP. The ZIP appears under the Release **Assets**, not in GitHub **Packages**.
 
 Before publishing a release with cloud sync, add these repository variables under **Settings → Secrets and variables → Actions → Variables**:
 
