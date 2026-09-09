@@ -5,7 +5,7 @@
 
 body {
   margin: 0;
-  width: 292px;
+  width: 320px;
 }
 
 .lc-popup {
@@ -142,4 +142,83 @@ p {
 .lc-popup__action-error {
   color: #b91c1c;
   margin-top: 8px;
+}
+
+.lc-popup__sync form {
+  display: grid;
+  gap: 8px;
+}
+
+.lc-popup__sync input {
+  border: 1px solid #dbe2ea;
+  border-radius: 9px;
+  box-sizing: border-box;
+  font: inherit;
+  font-size: 12px;
+  height: 34px;
+  outline: none;
+  padding: 0 10px;
+  width: 100%;
+}
+
+.lc-popup__sync input:focus {
+  border-color: #64748b;
+  box-shadow: 0 0 0 2px rgba(100, 116, 139, 0.12);
+}
+
+.lc-popup__sync-row {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+}
+
+.lc-popup__account {
+  color: #1e293b;
+  font-weight: 700;
+  max-width: 230px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lc-popup__sync-dot {
+  background: #22c55e;
+  border-radius: 50%;
+  height: 8px;
+  width: 8px;
+}
+
+.lc-popup__sync-dot--error {
+  background: #ef4444;
+}
+
+.lc-popup__button-row {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: 1fr 1fr;
+  margin-top: 9px;
+}
+
+.lc-popup__button-row button {
+  background: #0f172a;
+  border: 1px solid #0f172a;
+  border-radius: 9px;
+  color: #fff;
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  height: 34px;
+}
+
+.lc-popup__button-row .lc-popup__button--quiet {
+  background: #fff;
+  border-color: #dbe2ea;
+  color: #475569;
+}
+
+.lc-popup__button-row button:disabled,
+.lc-popup__sync input:disabled {
+  cursor: wait;
+  opacity: 0.6;
 }

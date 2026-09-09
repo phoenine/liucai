@@ -1,58 +1,88 @@
-# 六彩 liucai
+# 六彩 Liucai
 
-六彩是一个个人自用、Chrome-only 的本地网页高亮与批注插件。
+[简体中文](README.md) · [English](README.en.md)
 
-当前阶段只实现 Chrome 插件 + IndexedDB：
+六彩是一款 Chrome 网页高亮与批注扩展。它以本地数据为核心：不登录也能完整使用；登录 Supabase 后，可将数据备份到云端并在多台电脑之间同步。
 
-- 网页选中文本后显示紧凑白底高亮工具条
-- 支持 3 种高亮色：暖黄、薄荷、珊瑚
-- 支持给高亮添加/编辑批注和标签
-- 有批注或标签的高亮会显示提示图标，悬停可查看内容
-- 高亮和批注保存到 Chrome IndexedDB
-- 重新打开页面后从 IndexedDB 读取并重新渲染
-- Popup 展示当前页面高亮数量
-- 右侧 Mini 侧边栏常驻显示当前页划线数量，点击展开划线列表
-- 划线列表侧边栏支持定位、编辑、复制、删除当前页划线
+> 当前处于开发预览阶段，仅支持通过“加载已解压的扩展程序”安装。
 
-后续阶段再讨论 Obsidian 同步，不在当前 MVP 内实现。
+![网页高亮与批注](images/pic1.png)
+
+## 功能
+
+- 三种高亮颜色：暖黄、薄荷、珊瑚
+- 为高亮添加批注和标签
+- 悬停查看批注与标签
+- 页面刷新或重新打开后自动恢复高亮
+- 右侧划线列表支持定位、编辑、复制和删除
+- 导出适合 Obsidian 的 Markdown
+- 按域名禁用或恢复划线功能
+- 可选的 Supabase 云备份与跨设备同步
+
+![高亮工具条](images/pic2.png)
+
+![划线列表](images/pic3.png)
+
+## 本地优先与云同步
+
+高亮、批注和标签始终先写入扩展自己的 IndexedDB，不等待网络请求。未登录、断网或 Supabase 暂时不可用时，本地功能仍然正常。
+
+登录后，同步会在以下时机自动运行：
+
+- 登录、扩展后台启动或打开普通网页时
+- 新增、修改或删除高亮后
+- 每 5 分钟进行一次兜底检查
+
+也可以在 Popup 中点击“立即同步”。新电脑登录同一账号后，会从 Supabase 下载云端数据并恢复到本地。尚未上传成功的本地数据如果被删除，则无法从云端恢复。
+
+首版中，一个本地数据库只绑定一个 Supabase 账号，避免退出后误将同一份本地数据上传到其他账号。
+
+## 安装
+
+### 从 GitHub Release 安装
+
+1. 在 Releases 页面下载 `liucai-extension-v<version>.zip`。
+2. 解压 ZIP。
+3. 打开 `chrome://extensions/`。
+4. 开启“开发者模式”。
+5. 点击“加载已解压的扩展程序”，选择解压后的目录。
+
+升级版本时，重新解压并在扩展管理页点击刷新；已保存的数据不会因普通升级而删除。
+
+### 从源码安装
+
+```bash
+npm install
+cp .env.example .env.local
+npm run build
+```
+
+在 `.env.local` 中填写 Supabase Project URL 和 publishable key，然后在 Chrome 中加载 `dist/`。客户端不得使用 secret 或 service role key。
 
 ## 开发
 
 ```bash
-npm install
+npm test
 npm run typecheck
 npm run build
+npm run package
 ```
 
-构建产物会输出到 `dist/`。构建脚本会固定 popup 样式文件名为 `liucai.css`，并在构建结束时校验 `popup.html` 与 CSS 产物一致，避免样式引用断裂。
-
-## 在 Chrome 中加载
-
-1. 打开：
-
-```text
-chrome://extensions/
-```
-
-2. 开启“开发者模式”。
-3. 点击“加载已解压的扩展程序”。
-4. 选择本项目的 `dist/` 目录。
-5. 如果已经加载过旧版本，先在扩展页点击刷新，再刷新测试网页；content script 只会在页面加载时重新注入。
-
-## 手动验收清单
-
-1. 在普通文章页面选择一段文字，确认白底工具条出现。
-2. 点击颜色创建高亮。
-3. 点击已高亮文本，确认工具条显示：颜色入口、批注、标签、复制、删除。
-4. 添加批注或标签，确认高亮末尾出现提示图标，悬停可查看内容。
-5. 刷新页面，确认高亮能恢复。
-6. 删除高亮后再次刷新，确认不会恢复已删除内容。
-7. 点击浏览器工具栏里的六彩图标，确认 popup 能显示当前页高亮数量。
-8. 查看页面右侧 Mini 侧边栏，确认数量与当前页划线一致。
-9. 点击 Mini 侧边栏展开划线列表，确认可定位、编辑、复制、删除。
+- `npm run build`：生成 `dist/`
+- `npm run package`：生成 `artifacts/liucai-extension-v<version>.zip`
+- ZIP 根目录直接包含 `manifest.json`，不包含 source map
 
 ## 当前限制
 
-- 只支持普通网页正文，不保证支持 PDF、iframe、Shadow DOM、Google Docs、飞书文档、Notion 等复杂动态页面。
-- 高亮定位采用 text position + exact/prefix/suffix 的简化恢复策略，页面内容大幅变化时可能无法恢复。
-- 暂不支持 Obsidian 同步。
+- 仅支持桌面版 Chrome 和普通网页正文。
+- 暂不保证支持 PDF、iframe、Shadow DOM、Google Docs、飞书文档、Notion 等复杂页面。
+- 页面内容大幅变化后，保存的文本位置可能无法恢复。
+- 跨设备变化不是实时推送；空闲设备最多约 5 分钟后拉取。
+- 尚未实现多账号本地隔离和 Obsidian 自动同步。
+
+## 数据与安全
+
+- 本地数据保存在扩展 origin 的 IndexedDB 中。
+- Supabase 会话保存在 `chrome.storage.local`，不会暴露给网页脚本。
+- 客户端只包含 Supabase publishable key。
+- 云端写入通过认证 RPC 完成，用户数据由 Row Level Security 隔离。

@@ -1,0 +1,2 @@
+-- Liucai does not require shared seed data. Database tests create and roll back
+-- their own users and records.

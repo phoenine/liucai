@@ -1,6 +1,12 @@
 import { useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
-import type { PageStatus, PageStatusResponse } from "./messages";
+import type {
+  PageStatus,
+  PageStatusResponse,
+  StorageResponse,
+  SyncRequest,
+  SyncStatus,
+} from "./messages";
 import "./popup.css";
 
 type LoadState =
@@ -12,9 +18,17 @@ function PopupApp() {
   const [state, setState] = useState<LoadState>({ status: "loading" });
   const [updating, setUpdating] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [syncStatus, setSyncStatus] = useState<SyncStatus | null>(null);
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [authBusy, setAuthBusy] = useState(false);
+  const [authNotice, setAuthNotice] = useState<string | null>(null);
 
   useEffect(() => {
     void loadCurrentPageStatus().then(setState);
+    void sendSyncRequest({ type: "LIUCAI_SYNC_GET_STATUS" })
+      .then(setSyncStatus)
+      .catch((error) => setAuthNotice(error instanceof Error ? error.message : String(error)));
   }, []);
 
   const page = state.status === "ready" ? state.page : null;
@@ -37,6 +51,45 @@ function PopupApp() {
     }
   }
 
+  async function submitAuth(action: "sign-in" | "sign-up"): Promise<void> {
+    if (authBusy) return;
+    if (!email.trim() || password.length < 6) {
+      setAuthNotice("请输入邮箱，密码至少 6 位。");
+      return;
+    }
+    setAuthBusy(true);
+    setAuthNotice(null);
+    try {
+      const next = await sendSyncRequest({
+        type: action === "sign-in" ? "LIUCAI_SYNC_SIGN_IN" : "LIUCAI_SYNC_SIGN_UP",
+        email,
+        password,
+      });
+      setSyncStatus(next);
+      setPassword("");
+      if (action === "sign-up" && !next.signedIn) {
+        setAuthNotice("注册成功，请按 Supabase 邮件完成验证后再登录。");
+      }
+    } catch (error) {
+      setAuthNotice(error instanceof Error ? error.message : String(error));
+    } finally {
+      setAuthBusy(false);
+    }
+  }
+
+  async function runSyncAction(type: "LIUCAI_SYNC_SIGN_OUT" | "LIUCAI_SYNC_RETRY"): Promise<void> {
+    if (authBusy) return;
+    setAuthBusy(true);
+    setAuthNotice(null);
+    try {
+      setSyncStatus(await sendSyncRequest({ type }));
+    } catch (error) {
+      setAuthNotice(error instanceof Error ? error.message : String(error));
+    } finally {
+      setAuthBusy(false);
+    }
+  }
+
   return (
     <main className="lc-popup">
       <header className="lc-popup__header">
@@ -50,6 +103,57 @@ function PopupApp() {
       <section className={`lc-popup__card lc-popup__status${siteDisabled ? " lc-popup__status--disabled" : ""}`}>
         <h2>当前页面</h2>
         {renderStatus(state)}
+      </section>
+
+      <section className="lc-popup__card lc-popup__sync">
+        <h2>云端同步</h2>
+        {syncStatus?.signedIn ? (
+          <div>
+            <div className="lc-popup__sync-row">
+              <div>
+                <p className="lc-popup__account">{syncStatus.email ?? "已登录"}</p>
+                <p className="lc-popup__muted">{formatSyncSummary(syncStatus)}</p>
+              </div>
+              <span className={`lc-popup__sync-dot${syncStatus.error ? " lc-popup__sync-dot--error" : ""}`} />
+            </div>
+            <div className="lc-popup__button-row">
+              <button disabled={authBusy} onClick={() => void runSyncAction("LIUCAI_SYNC_RETRY")} type="button">
+                {authBusy ? "处理中……" : "立即同步"}
+              </button>
+              <button className="lc-popup__button--quiet" disabled={authBusy} onClick={() => void runSyncAction("LIUCAI_SYNC_SIGN_OUT")} type="button">
+                退出
+              </button>
+            </div>
+          </div>
+        ) : syncStatus?.configured === false ? (
+          <p className="lc-popup__muted">构建时尚未配置 Supabase。</p>
+        ) : (
+          <form onSubmit={(event) => { event.preventDefault(); void submitAuth("sign-in"); }}>
+            <input
+              autoComplete="email"
+              disabled={authBusy}
+              onChange={(event) => setEmail(event.target.value)}
+              placeholder="邮箱"
+              type="email"
+              value={email}
+            />
+            <input
+              autoComplete="current-password"
+              disabled={authBusy}
+              onChange={(event) => setPassword(event.target.value)}
+              placeholder="密码（至少 6 位）"
+              type="password"
+              value={password}
+            />
+            <div className="lc-popup__button-row">
+              <button disabled={authBusy} type="submit">{authBusy ? "处理中……" : "登录"}</button>
+              <button className="lc-popup__button--quiet" disabled={authBusy} onClick={() => void submitAuth("sign-up")} type="button">注册</button>
+            </div>
+          </form>
+        )}
+        {authNotice || syncStatus?.error ? (
+          <p className="lc-popup__action-error" role="alert">{authNotice ?? syncStatus?.error}</p>
+        ) : null}
       </section>
 
       <section className="lc-popup__card">
@@ -76,6 +180,20 @@ function PopupApp() {
       ) : null}
     </main>
   );
+}
+
+function formatSyncSummary(status: SyncStatus): string {
+  if (status.syncing) return `同步中 · ${status.pendingCount} 条待上传`;
+  if (status.error) return `同步失败 · ${status.pendingCount} 条待上传`;
+  if (status.pendingCount > 0) return `${status.pendingCount} 条等待同步`;
+  if (status.lastSyncedAt) return `已同步 · ${new Date(status.lastSyncedAt).toLocaleString("zh-CN")}`;
+  return "已登录，等待首次同步";
+}
+
+async function sendSyncRequest(request: SyncRequest): Promise<SyncStatus> {
+  const response = await chrome.runtime.sendMessage(request) as StorageResponse<SyncStatus> | undefined;
+  if (!response?.ok) throw new Error(response?.error ?? "同步服务暂不可用。");
+  return response.data;
 }
 
 function renderStatus(state: LoadState) {

@@ -9,11 +9,11 @@ import {
   SelectionToolbar,
   type EditorFocus,
 } from "./contentUi";
-import { db, getActiveHighlights, normalizeHighlightRecord, upsertPage } from "./db";
 import { createSelectorFromRange, rangesFromSelectors } from "./domText";
 import { applyHighlight, removeHighlightFromDom, updateHighlightAttributes } from "./highlightDom";
 import { HoverRequestTracker } from "./hoverRequest";
 import { generateUuid } from "./id";
+import { migrateLegacySiteData } from "./legacyMigration";
 import {
   isPageStatusRequest,
   isSetSiteDisabledRequest,
@@ -26,6 +26,13 @@ import {
 } from "./obsidianExport";
 import { getRangeDisplayText } from "./rangeDisplayText";
 import { isHostnameDisabled, setHostnameDisabled } from "./sitePreferences";
+import {
+  addHighlight,
+  getActiveHighlights,
+  getHighlight,
+  putHighlight,
+  upsertPage,
+} from "./storageClient";
 import type { HighlightColor, HighlightRecord, PageRecord } from "./types";
 import {
   createPageIdentity,
@@ -69,6 +76,9 @@ export class ContentController {
     window.addEventListener("hashchange", this.checkLocation);
     window.addEventListener("popstate", this.checkLocation);
     this.locationTimer = window.setInterval(this.checkLocation, LOCATION_CHECK_INTERVAL_MS);
+    await migrateLegacySiteData().catch((error) => {
+      this.reportError("legacy data migration", error);
+    });
     await this.transitions.run(() => this.syncActivation());
   }
 
@@ -172,17 +182,31 @@ export class ContentController {
   }
 
   private handleStorageChange = (
-    _changes: Record<string, chrome.storage.StorageChange>,
+    changes: Record<string, chrome.storage.StorageChange>,
     areaName: string,
   ): void => {
     if (areaName !== "local") {
       return;
     }
 
+    const task = changes["liucai.sync.changedAt"]
+      ? () => this.refreshSyncedPage()
+      : () => this.syncActivation();
     void this.transitions
-      .run(() => this.syncActivation())
+      .run(task)
       .catch((error) => this.reportError("site setting sync", error));
   };
+
+  private async refreshSyncedPage(): Promise<void> {
+    if (!this.pageActive || this.disposed) return;
+    this.mounts.hideToolbar();
+    this.mounts.hidePopover();
+    for (const span of Array.from(document.querySelectorAll<HTMLElement>(".liucai-highlight"))) {
+      span.replaceWith(...Array.from(span.childNodes));
+    }
+    await this.restoreHighlights();
+    await this.refreshSidebarData();
+  }
 
   private handleKeyDown = (event: KeyboardEvent): void => {
     if (event.key === "Escape") {
@@ -255,7 +279,7 @@ export class ContentController {
 
     const request = this.hoverRequests.begin(id);
     this.runAsync("load highlight tooltip", async () => {
-      const record = await db.highlights.get(id);
+      const record = await getHighlight(id);
       if (!this.hoverRequests.isCurrent(request) || !record || record.deletedAt) {
         return;
       }
@@ -303,7 +327,7 @@ export class ContentController {
     event.preventDefault();
     event.stopPropagation();
 
-    const record = await db.highlights.get(id);
+    const record = await getHighlight(id);
     if (!record || record.deletedAt) return;
 
     const rect = highlightEl.getBoundingClientRect();
@@ -513,7 +537,7 @@ export class ContentController {
     }
 
     try {
-      await db.highlights.add(highlight);
+      await addHighlight(highlight);
     } catch (error) {
       removeHighlightFromDom(highlight.id);
       throw error;
@@ -538,7 +562,7 @@ export class ContentController {
     note: string,
     tags: string[],
   ): Promise<void> {
-    const record = await db.highlights.get(id);
+    const record = await getHighlight(id);
     if (!record) return;
 
     const updated: HighlightRecord = {
@@ -547,7 +571,7 @@ export class ContentController {
       tags,
       updatedAt: new Date().toISOString(),
     };
-    await db.highlights.put(updated);
+    await putHighlight(updated);
     updateHighlightAttributes(updated);
     this.mounts.hidePopover();
     await this.refreshSidebarData();
@@ -557,7 +581,7 @@ export class ContentController {
     id: string,
     color: HighlightColor,
   ): Promise<void> {
-    const record = await db.highlights.get(id);
+    const record = await getHighlight(id);
     if (!record) return;
 
     const updated: HighlightRecord = {
@@ -565,7 +589,7 @@ export class ContentController {
       color,
       updatedAt: new Date().toISOString(),
     };
-    await db.highlights.put(updated);
+    await putHighlight(updated);
     for (const span of this.getHighlightSpans(id)) {
       span.dataset.color = color;
     }
@@ -636,11 +660,11 @@ export class ContentController {
   }
 
   private async deleteHighlight(id: string): Promise<void> {
-    const record = await db.highlights.get(id);
+    const record = await getHighlight(id);
     if (!record) return;
 
     const now = new Date().toISOString();
-    await db.highlights.put({
+    await putHighlight({
       ...normalizeHighlightRecord(record),
       deletedAt: now,
       updatedAt: now,
@@ -745,4 +769,8 @@ export class ContentController {
   private stringifyError(error: unknown): string {
     return error instanceof Error ? error.message : String(error);
   }
+}
+
+function normalizeHighlightRecord(record: HighlightRecord): HighlightRecord {
+  return { ...record, tags: Array.isArray(record.tags) ? record.tags : [] };
 }

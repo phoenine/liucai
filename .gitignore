@@ -1,7 +1,11 @@
 node_modules/
 dist/
+artifacts/
 .DS_Store
 *.log
 docs/
 .codegraph/
 .superpowers/
+.env
+.env.*
+!.env.example
