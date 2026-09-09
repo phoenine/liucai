@@ -72,6 +72,17 @@ npm run package
 - `npm run package` creates `artifacts/liucai-extension-v<version>.zip`
 - The ZIP root contains `manifest.json` directly and excludes source maps
 
+## GitHub CI and releases
+
+The [CI workflow](.github/workflows/ci-release.yml) runs tests, type checking, builds, and packaging on `main`, `dev`, pull requests, and manual runs. It retains the resulting Actions Artifact for 14 days.
+
+Pushing a tag that matches the version in `package.json`, such as `v0.1.0`, automatically creates or updates a GitHub Release and uploads the extension ZIP.
+
+Before publishing a release with cloud sync, add these repository variables under **Settings → Secrets and variables → Actions → Variables**:
+
+- `VITE_SUPABASE_URL`
+- `VITE_SUPABASE_PUBLISHABLE_KEY`
+
 ## Current limitations
 
 - Desktop Chrome and regular web page content only.

@@ -31,6 +31,7 @@ jobs:
           cache: npm
 
       - name: Verify client configuration
+        if: startsWith(github.ref, 'refs/tags/v')
         shell: bash
         run: |
           test -n "$VITE_SUPABASE_URL" || { echo "Missing repository variable VITE_SUPABASE_URL"; exit 1; }

@@ -72,6 +72,17 @@ npm run package
 - `npm run package`：生成 `artifacts/liucai-extension-v<version>.zip`
 - ZIP 根目录直接包含 `manifest.json`，不包含 source map
 
+## GitHub CI 与发布
+
+[CI workflow](.github/workflows/ci-release.yml) 会在 `main`、`dev`、Pull Request 和手动运行时执行测试、类型检查、构建与打包，并保存 14 天的 Actions Artifact。
+
+推送与 `package.json` 版本一致的标签，例如 `v0.1.0`，CI 会自动创建或更新 GitHub Release，并上传插件 ZIP。
+
+发布带云同步的版本前，在仓库 **Settings → Secrets and variables → Actions → Variables** 中添加：
+
+- `VITE_SUPABASE_URL`
+- `VITE_SUPABASE_PUBLISHABLE_KEY`
+
 ## 当前限制
 
 - 仅支持桌面版 Chrome 和普通网页正文。
