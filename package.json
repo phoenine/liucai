@@ -1,6 +1,6 @@
 {
   "name": "liucai",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "private": true,
   "description": "六彩：local-first Chrome web highlighter with optional Supabase sync.",
   "type": "module",

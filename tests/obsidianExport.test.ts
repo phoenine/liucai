@@ -145,7 +145,7 @@ test("formats a page export using the Obsidian clipping template", () => {
         tags: ["测试"],
       }),
     ],
-    exportedAt: new Date("2026-04-13T13:57:00+08:00"),
+    exportedAt: new Date(2026, 3, 13, 13, 57),
   });
 
   assert.equal(

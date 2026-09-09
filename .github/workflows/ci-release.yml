@@ -3,7 +3,7 @@ name: CI and release extension
 on:
   push:
     branches: [main, dev]
-    tags: ["v*"]
+    tags: ["v*", "[0-9]*"]
   pull_request:
   workflow_dispatch:
 
@@ -31,7 +31,7 @@ jobs:
           cache: npm
 
       - name: Verify client configuration
-        if: startsWith(github.ref, 'refs/tags/v')
+        if: startsWith(github.ref, 'refs/tags/')
         shell: bash
         run: |
           test -n "$VITE_SUPABASE_URL" || { echo "Missing repository variable VITE_SUPABASE_URL"; exit 1; }
@@ -53,16 +53,16 @@ jobs:
         run: npm run package
 
       - name: Verify release tag matches extension version
-        if: startsWith(github.ref, 'refs/tags/v')
+        if: startsWith(github.ref, 'refs/tags/')
         env:
           RELEASE_VERSION: ${{ github.ref_name }}
         run: |
           node --input-type=module --eval '
             import { readFile } from "node:fs/promises";
             const pkg = JSON.parse(await readFile("package.json", "utf8"));
-            const expected = `v${pkg.version}`;
-            if (process.env.RELEASE_VERSION !== expected) {
-              throw new Error(`Tag ${process.env.RELEASE_VERSION} must match ${expected}`);
+            const actual = process.env.RELEASE_VERSION?.replace(/^v/, "");
+            if (actual !== pkg.version) {
+              throw new Error(`Tag ${process.env.RELEASE_VERSION} must match ${pkg.version} (with an optional v prefix)`);
             }
           '
 
@@ -76,7 +76,7 @@ jobs:
           retention-days: 14
 
   release:
-    if: startsWith(github.ref, 'refs/tags/v')
+    if: startsWith(github.ref, 'refs/tags/')
     needs: build
     runs-on: ubuntu-latest
     permissions:
@@ -93,9 +93,11 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GH_REPO: ${{ github.repository }}
           RELEASE_TAG: ${{ github.ref_name }}
+          PACKAGE_VERSION: ${{ github.ref_name }}
         shell: bash
         run: |
-          ZIP_PATH="artifacts/liucai-extension-${RELEASE_TAG}.zip"
+          PACKAGE_VERSION="${PACKAGE_VERSION#v}"
+          ZIP_PATH="artifacts/liucai-extension-v${PACKAGE_VERSION}.zip"
           if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
             gh release upload "$RELEASE_TAG" "$ZIP_PATH" --clobber
           else
