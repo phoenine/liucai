@@ -1,4 +1,5 @@
 import { type ReactNode, useState } from "react";
+import type { ContentCopy } from "./localization";
 import { continueNoteList, parseNoteBlocks } from "./noteFormat";
 import {
   nextDeleteState,
@@ -9,15 +10,16 @@ import {
 import { parseTags } from "./tags";
 import type { HighlightColor, HighlightRecord } from "./types";
 
-const COLORS: Array<{ color: HighlightColor; value: string; label: string }> = [
-  { color: "gold", value: "#FFEA70", label: "暖黄" },
-  { color: "mint", value: "#4DF4C9", label: "薄荷" },
-  { color: "coral", value: "#FFAFA1", label: "珊瑚" },
+const COLORS: Array<{ color: HighlightColor; value: string }> = [
+  { color: "gold", value: "#FFEA70" },
+  { color: "mint", value: "#4DF4C9" },
+  { color: "coral", value: "#FFAFA1" },
 ];
 
 export type EditorFocus = "note" | "tags";
 
 export function SelectionToolbar(props: {
+  copy: ContentCopy;
   onColor: (color: HighlightColor) => void;
   onNote: () => void;
   onTags: () => void;
@@ -25,16 +27,22 @@ export function SelectionToolbar(props: {
   return (
     <>
       {COLORS.map((item) => (
-        <ColorButton key={item.color} item={item} onClick={() => props.onColor(item.color)} />
+        <ColorButton
+          key={item.color}
+          item={item}
+          label={props.copy.colors[item.color]}
+          onClick={() => props.onColor(item.color)}
+        />
       ))}
       <span className="liucai-toolbar-divider" />
-      <IconButton kind="note" label="批注" onClick={props.onNote}>{icons.note}</IconButton>
-      <IconButton kind="tag" label="标签" onClick={props.onTags}>{icons.tag}</IconButton>
+      <IconButton kind="note" label={props.copy.note} onClick={props.onNote}>{icons.note}</IconButton>
+      <IconButton kind="tag" label={props.copy.tags} onClick={props.onTags}>{icons.tag}</IconButton>
     </>
   );
 }
 
 export function ExistingHighlightToolbar(props: {
+  copy: ContentCopy;
   record: HighlightRecord;
   onColor: (color: HighlightColor) => void;
   onNote: () => void;
@@ -47,12 +55,18 @@ export function ExistingHighlightToolbar(props: {
 
   return (
     <>
-      <IconButton kind="palette" label="修改颜色" onClick={() => setPaletteOpen((open) => !open)}>{icons.palette}</IconButton>
-      <IconButton kind="note" label="批注" onClick={props.onNote}>{icons.note}</IconButton>
-      <IconButton kind="tag" label="标签" onClick={props.onTags}>{icons.tag}</IconButton>
+      <IconButton
+        kind="palette"
+        label={props.copy.changeColor}
+        onClick={() => setPaletteOpen((open) => !open)}
+      >
+        {icons.palette}
+      </IconButton>
+      <IconButton kind="note" label={props.copy.note} onClick={props.onNote}>{icons.note}</IconButton>
+      <IconButton kind="tag" label={props.copy.tags} onClick={props.onTags}>{icons.tag}</IconButton>
       <IconButton
         kind={`copy${copied ? " is-copied" : ""}`}
-        label={copied ? "已复制" : "复制摘录"}
+        label={copied ? props.copy.copied : props.copy.copyExcerpt}
         onClick={() => {
           props.onCopy();
           setCopied(true);
@@ -61,11 +75,16 @@ export function ExistingHighlightToolbar(props: {
       >
         {icons.copy}
       </IconButton>
-      <IconButton kind="delete" label="删除" onClick={props.onDelete}>{icons.delete}</IconButton>
+      <IconButton kind="delete" label={props.copy.delete} onClick={props.onDelete}>{icons.delete}</IconButton>
       {paletteOpen ? (
         <div className="liucai-palette-popout">
           {COLORS.map((item) => (
-            <ColorButton key={item.color} item={item} onClick={() => props.onColor(item.color)} />
+            <ColorButton
+              key={item.color}
+              item={item}
+              label={props.copy.colors[item.color]}
+              onClick={() => props.onColor(item.color)}
+            />
           ))}
         </div>
       ) : null}
@@ -73,9 +92,18 @@ export function ExistingHighlightToolbar(props: {
   );
 }
 
-export function MiniSidebarLauncher(props: { count: number; open: boolean; onToggle: () => void }) {
+export function MiniSidebarLauncher(props: {
+  copy: ContentCopy;
+  count: number;
+  open: boolean;
+  onToggle: () => void;
+}) {
   return (
-    <button className={`liucai-mini-sidebar${props.open ? " is-open" : ""}`} title="六彩划线列表" onClick={props.onToggle}>
+    <button
+      className={`liucai-mini-sidebar${props.open ? " is-open" : ""}`}
+      title={props.copy.sidebarLabel}
+      onClick={props.onToggle}
+    >
       <span className="liucai-mini-sidebar__icon">{icons.list}</span>
       <span className="liucai-mini-sidebar__count">{props.count}</span>
     </button>
@@ -83,6 +111,7 @@ export function MiniSidebarLauncher(props: { count: number; open: boolean; onTog
 }
 
 export function HighlightSidebar(props: {
+  copy: ContentCopy;
   pageTitle: string;
   records: HighlightRecord[];
   onClose: () => void;
@@ -94,10 +123,10 @@ export function HighlightSidebar(props: {
 }) {
   const [exportStatus, setExportStatus] = useState<CopyStatus>("idle");
   const exportLabel = {
-    idle: "导出",
-    copying: "导出中…",
-    copied: "已导出",
-    failed: "导出失败",
+    idle: props.copy.export,
+    copying: props.copy.exporting,
+    copied: props.copy.exported,
+    failed: props.copy.exportFailed,
   }[exportStatus];
 
   const handleExport = (): void => {
@@ -109,24 +138,24 @@ export function HighlightSidebar(props: {
   };
 
   return (
-    <aside className="liucai-sidebar" aria-label="六彩划线列表">
+    <aside className="liucai-sidebar" aria-label={props.copy.sidebarLabel}>
       <header className="liucai-sidebar__header">
         <div className="liucai-sidebar__heading">
-          <h2>划线列表</h2>
-          <span className="liucai-sidebar__count">{props.records.length} 条</span>
+          <h2>{props.copy.sidebarTitle}</h2>
+          <span className="liucai-sidebar__count">{props.copy.highlightCount(props.records.length)}</span>
         </div>
-        <button className="liucai-sidebar__close" title="收起" onClick={props.onClose}>{icons.close}</button>
+        <button className="liucai-sidebar__close" title={props.copy.collapse} onClick={props.onClose}>{icons.close}</button>
       </header>
       <div
         className="liucai-sidebar__page-title"
-        title={props.pageTitle || "未命名页面"}
+        title={props.pageTitle || props.copy.untitledPage}
       >
-        {props.pageTitle || "未命名页面"}
+        {props.pageTitle || props.copy.untitledPage}
       </div>
       <div className="liucai-sidebar__export">
         <div className="liucai-sidebar__export-copy">
-          <strong>导出 Obsidian Markdown</strong>
-          <span>包含 Frontmatter、原文链接、批注和标签</span>
+          <strong>{props.copy.exportTitle}</strong>
+          <span>{props.copy.exportDescription}</span>
         </div>
         <button
           aria-live="polite"
@@ -142,14 +171,15 @@ export function HighlightSidebar(props: {
       <div aria-hidden="true" className="liucai-sidebar__divider" />
       {props.records.length === 0 ? (
         <div className="liucai-sidebar__empty">
-          <strong>还没有划线</strong>
-          <span>在网页中选中文本后，点击颜色即可加入这里。</span>
+          <strong>{props.copy.emptyTitle}</strong>
+          <span>{props.copy.emptyDescription}</span>
         </div>
       ) : (
         <div className="liucai-sidebar__list">
           {props.records.map((record, index) => (
             <HighlightSidebarItem
               key={record.id}
+              copy={props.copy}
               index={index + 1}
               record={record}
               onLocate={() => props.onLocate(record.id)}
@@ -165,6 +195,7 @@ export function HighlightSidebar(props: {
 }
 
 function HighlightSidebarItem(props: {
+  copy: ContentCopy;
   index: number;
   record: HighlightRecord;
   onLocate: () => void;
@@ -176,10 +207,10 @@ function HighlightSidebarItem(props: {
   const [copyStatus, setCopyStatus] = useState<CopyStatus>("idle");
   const [deleteState, setDeleteState] = useState<DeleteState>("idle");
   const copyLabel = {
-    idle: "复制",
-    copying: "复制中…",
-    copied: "已复制",
-    failed: "复制失败",
+    idle: props.copy.copy,
+    copying: props.copy.copying,
+    copied: props.copy.copied,
+    failed: props.copy.copyFailed,
   }[copyStatus];
 
   const handleCopy = (): void => {
@@ -200,17 +231,17 @@ function HighlightSidebarItem(props: {
   return (
     <article className="liucai-sidebar-item" data-color={props.record.color}>
       <button
-        aria-label={`定位第 ${props.index} 条划线`}
+        aria-label={props.copy.locateLabel(props.index)}
         className="liucai-sidebar-item__rail"
         onClick={props.onLocate}
-        title="定位到网页划线"
+        title={props.copy.locateTitle}
       >
         <span aria-hidden="true" className="liucai-sidebar-item__dot" />
         <span className="liucai-sidebar-item__index">{String(props.index).padStart(2, "0")}</span>
         <span aria-hidden="true" className="liucai-sidebar-item__line" />
       </button>
       <div className="liucai-sidebar-item__content">
-        <button className="liucai-sidebar-item__main" onClick={props.onLocate} title="定位到网页划线">
+        <button className="liucai-sidebar-item__main" onClick={props.onLocate} title={props.copy.locateTitle}>
           <span className="liucai-sidebar-item__text">{props.record.text}</span>
         </button>
         {props.record.note.trim() ? (
@@ -226,7 +257,7 @@ function HighlightSidebarItem(props: {
         <div className="liucai-sidebar-item__actions">
           {deleteState === "idle" ? (
             <>
-              <button onClick={props.onEdit}>编辑</button>
+              <button onClick={props.onEdit}>{props.copy.edit}</button>
               <button
                 aria-live="polite"
                 data-status={copyStatus}
@@ -239,7 +270,7 @@ function HighlightSidebarItem(props: {
                 data-danger="true"
                 onClick={() => setDeleteState((state) => nextDeleteState(state, "request"))}
               >
-                删除
+                {props.copy.delete}
               </button>
             </>
           ) : (
@@ -248,14 +279,14 @@ function HighlightSidebarItem(props: {
                 disabled={deleteState === "deleting"}
                 onClick={() => setDeleteState((state) => nextDeleteState(state, "cancel"))}
               >
-                取消
+                {props.copy.cancel}
               </button>
               <button
                 data-danger="true"
                 disabled={deleteState === "deleting"}
                 onClick={handleDelete}
               >
-                {deleteState === "deleting" ? "删除中…" : "确认删除"}
+                {deleteState === "deleting" ? props.copy.deleting : props.copy.confirmDelete}
               </button>
             </>
           )}
@@ -306,14 +337,18 @@ export function FormattedNote(props: { value: string }) {
   );
 }
 
-function ColorButton(props: { item: { color: HighlightColor; value: string; label: string }; onClick: () => void }) {
+function ColorButton(props: {
+  item: { color: HighlightColor; value: string };
+  label: string;
+  onClick: () => void;
+}) {
   return (
     <button
       className="liucai-color-button"
       data-color={props.item.color}
       style={{ "--dot-color": props.item.value } as React.CSSProperties}
-      title={props.item.label}
-      aria-label={props.item.label}
+      title={props.label}
+      aria-label={props.label}
       onClick={(event) => {
         event.preventDefault();
         event.stopPropagation();
@@ -341,22 +376,23 @@ function IconButton(props: { kind: string; label: string; children: ReactNode; o
 }
 
 export function EditorPopover(props: {
+  copy: ContentCopy;
   record: HighlightRecord;
   focus: EditorFocus;
   onCancel: () => void;
   onSave: (id: string, note: string, tags: string[]) => void;
 }) {
   const [note, setNote] = useState(props.record.note);
-  const [tagText, setTagText] = useState(props.record.tags.join("，"));
+  const [tagText, setTagText] = useState(props.record.tags.join(props.copy.tagSeparator));
 
   return (
     <>
-      <div className="liucai-popover-title">批注与标签</div>
-      <label className="liucai-field-label">批注</label>
+      <div className="liucai-popover-title">{props.copy.editorTitle}</div>
+      <label className="liucai-field-label">{props.copy.note}</label>
       <textarea
         autoFocus={props.focus === "note"}
         value={note}
-        placeholder="写下想法；输入 1. 或 - 创建列表……"
+        placeholder={props.copy.notePlaceholder}
         onChange={(event) => setNote(event.currentTarget.value)}
         onKeyDown={(event) => {
           if (event.key !== "Enter" || event.nativeEvent.isComposing) {
@@ -374,17 +410,17 @@ export function EditorPopover(props: {
           });
         }}
       />
-      <label className="liucai-field-label">标签</label>
+      <label className="liucai-field-label">{props.copy.tags}</label>
       <input
         className="liucai-tag-input"
         autoFocus={props.focus === "tags"}
         value={tagText}
-        placeholder="输入标签，如 AI/Agent，测试/用例设计"
+        placeholder={props.copy.tagsPlaceholder}
         onChange={(event) => setTagText(event.currentTarget.value)}
       />
       <div className="liucai-popover-actions">
-        <button data-action="cancel" onClick={props.onCancel}>取消</button>
-        <button data-action="save" onClick={() => props.onSave(props.record.id, note, parseTags(tagText))}>保存</button>
+        <button data-action="cancel" onClick={props.onCancel}>{props.copy.cancel}</button>
+        <button data-action="save" onClick={() => props.onSave(props.record.id, note, parseTags(tagText))}>{props.copy.save}</button>
       </div>
     </>
   );

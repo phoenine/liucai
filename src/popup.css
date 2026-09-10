@@ -16,8 +16,15 @@ body {
 .lc-popup__header {
   align-items: center;
   display: flex;
-  gap: 10px;
+  justify-content: space-between;
   margin-bottom: 12px;
+}
+
+.lc-popup__brand {
+  align-items: center;
+  display: flex;
+  gap: 10px;
+  min-width: 0;
 }
 
 .lc-popup__logo {
@@ -31,6 +38,33 @@ body {
   height: 42px;
   justify-content: center;
   width: 42px;
+}
+
+.lc-popup__settings-button {
+  align-items: center;
+  background: transparent;
+  border: 0;
+  border-radius: 9px;
+  color: #64748b;
+  cursor: pointer;
+  display: flex;
+  flex: 0 0 auto;
+  height: 32px;
+  justify-content: center;
+  padding: 0;
+  transition: background 160ms ease, color 160ms ease;
+  width: 32px;
+}
+
+.lc-popup__settings-button:hover {
+  background: #e9eef5;
+  color: #0f172a;
+}
+
+.lc-popup__settings-button:focus-visible {
+  box-shadow: 0 0 0 3px rgba(100, 116, 139, 0.2);
+  outline: 2px solid #475569;
+  outline-offset: 1px;
 }
 
 h1 {

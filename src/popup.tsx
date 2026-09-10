@@ -1,3 +1,4 @@
+import { GearSixIcon } from "@phosphor-icons/react";
 import { useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
 import type {
@@ -7,6 +8,12 @@ import type {
   SyncRequest,
   SyncStatus,
 } from "./messages";
+import {
+  getPopupCopy,
+  resolveInterfaceLocale,
+  type PopupCopy,
+} from "./localization";
+import { DEFAULT_PREFERENCES, loadPreferences } from "./preferences";
 import "./popup.css";
 
 type LoadState =
@@ -23,13 +30,26 @@ function PopupApp() {
   const [password, setPassword] = useState("");
   const [authBusy, setAuthBusy] = useState(false);
   const [authNotice, setAuthNotice] = useState<string | null>(null);
+  const [preferences, setPreferences] = useState(DEFAULT_PREFERENCES);
+  const locale = resolveInterfaceLocale(preferences.general.interfaceLanguage);
+  const copy = getPopupCopy(locale);
 
   useEffect(() => {
-    void loadCurrentPageStatus().then(setState);
-    void sendSyncRequest({ type: "LIUCAI_SYNC_GET_STATUS" })
-      .then(setSyncStatus)
-      .catch((error) => setAuthNotice(error instanceof Error ? error.message : String(error)));
+    void loadPreferences()
+      .catch(() => DEFAULT_PREFERENCES)
+      .then((loaded) => {
+        setPreferences(loaded);
+        const loadedCopy = getPopupCopy(resolveInterfaceLocale(loaded.general.interfaceLanguage));
+        void loadCurrentPageStatus(loadedCopy).then(setState);
+        void sendSyncRequest({ type: "LIUCAI_SYNC_GET_STATUS" }, loadedCopy.syncUnavailable)
+          .then(setSyncStatus)
+          .catch((error) => setAuthNotice(error instanceof Error ? error.message : String(error)));
+      });
   }, []);
+
+  useEffect(() => {
+    document.documentElement.lang = locale;
+  }, [locale]);
 
   const page = state.status === "ready" ? state.page : null;
   const siteDisabled = page?.disabled === true;
@@ -42,7 +62,7 @@ function PopupApp() {
     setUpdating(true);
     setActionError(null);
     try {
-      const updatedPage = await setCurrentSiteDisabled(!siteDisabled);
+      const updatedPage = await setCurrentSiteDisabled(!siteDisabled, copy);
       setState({ status: "ready", page: updatedPage });
     } catch (error) {
       setActionError(error instanceof Error ? error.message : String(error));
@@ -54,7 +74,7 @@ function PopupApp() {
   async function submitAuth(action: "sign-in" | "sign-up"): Promise<void> {
     if (authBusy) return;
     if (!email.trim() || password.length < 6) {
-      setAuthNotice("请输入邮箱，密码至少 6 位。");
+      setAuthNotice(copy.authValidation);
       return;
     }
     setAuthBusy(true);
@@ -64,11 +84,11 @@ function PopupApp() {
         type: action === "sign-in" ? "LIUCAI_SYNC_SIGN_IN" : "LIUCAI_SYNC_SIGN_UP",
         email,
         password,
-      });
+      }, copy.syncUnavailable);
       setSyncStatus(next);
       setPassword("");
       if (action === "sign-up" && !next.signedIn) {
-        setAuthNotice("注册成功，请按 Supabase 邮件完成验证后再登录。");
+        setAuthNotice(copy.signUpConfirmation);
       }
     } catch (error) {
       setAuthNotice(error instanceof Error ? error.message : String(error));
@@ -82,7 +102,7 @@ function PopupApp() {
     setAuthBusy(true);
     setAuthNotice(null);
     try {
-      setSyncStatus(await sendSyncRequest({ type }));
+      setSyncStatus(await sendSyncRequest({ type }, copy.syncUnavailable));
     } catch (error) {
       setAuthNotice(error instanceof Error ? error.message : String(error));
     } finally {
@@ -93,47 +113,58 @@ function PopupApp() {
   return (
     <main className="lc-popup">
       <header className="lc-popup__header">
-        <div className="lc-popup__logo">六</div>
-        <div>
-          <h1>六彩 Liucai</h1>
-          <p>本地网页高亮与批注</p>
+        <div className="lc-popup__brand">
+          <div className="lc-popup__logo">六</div>
+          <div>
+            <h1>六彩 Liucai</h1>
+            <p>{copy.tagline}</p>
+          </div>
         </div>
+        <button
+          aria-label={copy.settings}
+          className="lc-popup__settings-button"
+          onClick={() => void openSettings()}
+          title={copy.settings}
+          type="button"
+        >
+          <GearSixIcon aria-hidden="true" size={20} weight="regular" />
+        </button>
       </header>
 
       <section className={`lc-popup__card lc-popup__status${siteDisabled ? " lc-popup__status--disabled" : ""}`}>
-        <h2>当前页面</h2>
-        {renderStatus(state)}
+        <h2>{copy.currentPage}</h2>
+        {renderStatus(state, copy)}
       </section>
 
       <section className="lc-popup__card lc-popup__sync">
-        <h2>云端同步</h2>
+        <h2>{copy.cloudSync}</h2>
         {syncStatus?.signedIn ? (
           <div>
             <div className="lc-popup__sync-row">
               <div>
-                <p className="lc-popup__account">{syncStatus.email ?? "已登录"}</p>
-                <p className="lc-popup__muted">{formatSyncSummary(syncStatus)}</p>
+                <p className="lc-popup__account">{syncStatus.email ?? copy.signedIn}</p>
+                <p className="lc-popup__muted">{formatSyncSummary(syncStatus, copy, locale)}</p>
               </div>
               <span className={`lc-popup__sync-dot${syncStatus.error ? " lc-popup__sync-dot--error" : ""}`} />
             </div>
             <div className="lc-popup__button-row">
               <button disabled={authBusy} onClick={() => void runSyncAction("LIUCAI_SYNC_RETRY")} type="button">
-                {authBusy ? "处理中……" : "立即同步"}
+                {authBusy ? copy.working : copy.syncNow}
               </button>
               <button className="lc-popup__button--quiet" disabled={authBusy} onClick={() => void runSyncAction("LIUCAI_SYNC_SIGN_OUT")} type="button">
-                退出
+                {copy.signOut}
               </button>
             </div>
           </div>
         ) : syncStatus?.configured === false ? (
-          <p className="lc-popup__muted">构建时尚未配置 Supabase。</p>
+          <p className="lc-popup__muted">{copy.supabaseNotConfigured}</p>
         ) : (
           <form onSubmit={(event) => { event.preventDefault(); void submitAuth("sign-in"); }}>
             <input
               autoComplete="email"
               disabled={authBusy}
               onChange={(event) => setEmail(event.target.value)}
-              placeholder="邮箱"
+              placeholder={copy.email}
               type="email"
               value={email}
             />
@@ -141,13 +172,13 @@ function PopupApp() {
               autoComplete="current-password"
               disabled={authBusy}
               onChange={(event) => setPassword(event.target.value)}
-              placeholder="密码（至少 6 位）"
+              placeholder={copy.password}
               type="password"
               value={password}
             />
             <div className="lc-popup__button-row">
-              <button disabled={authBusy} type="submit">{authBusy ? "处理中……" : "登录"}</button>
-              <button className="lc-popup__button--quiet" disabled={authBusy} onClick={() => void submitAuth("sign-up")} type="button">注册</button>
+              <button disabled={authBusy} type="submit">{authBusy ? copy.working : copy.signIn}</button>
+              <button className="lc-popup__button--quiet" disabled={authBusy} onClick={() => void submitAuth("sign-up")} type="button">{copy.signUp}</button>
             </div>
           </form>
         )}
@@ -157,11 +188,11 @@ function PopupApp() {
       </section>
 
       <section className="lc-popup__card">
-        <h2>快速操作</h2>
+        <h2>{copy.quickActions}</h2>
         <ul>
-          <li>选中文本：三色高亮 + 批注 + 标签</li>
-          <li>点击已划线：调色盘 + 批注 + 标签 + 复制 + 删除</li>
-          <li>数据保存到 Chrome IndexedDB</li>
+          <li>{copy.selectionAction}</li>
+          <li>{copy.existingHighlightAction}</li>
+          <li>{copy.localStorageAction}</li>
         </ul>
       </section>
 
@@ -173,7 +204,7 @@ function PopupApp() {
             onClick={() => void toggleCurrentSite()}
             type="button"
           >
-            {updating ? "正在更新……" : siteDisabled ? "恢复此网站划线" : "在此网站禁用划线"}
+            {updating ? copy.updating : siteDisabled ? copy.restoreSite : copy.disableSite}
           </button>
           {actionError ? <p className="lc-popup__action-error" role="alert">{actionError}</p> : null}
         </section>
@@ -182,23 +213,41 @@ function PopupApp() {
   );
 }
 
-function formatSyncSummary(status: SyncStatus): string {
-  if (status.syncing) return `同步中 · ${status.pendingCount} 条待上传`;
-  if (status.error) return `同步失败 · ${status.pendingCount} 条待上传`;
-  if (status.pendingCount > 0) return `${status.pendingCount} 条等待同步`;
-  if (status.lastSyncedAt) return `已同步 · ${new Date(status.lastSyncedAt).toLocaleString("zh-CN")}`;
-  return "已登录，等待首次同步";
+async function openSettings(): Promise<void> {
+  if (typeof chrome !== "undefined" && chrome.runtime?.openOptionsPage) {
+    await chrome.runtime.openOptionsPage();
+    return;
+  }
+
+  window.location.href = "options.html";
 }
 
-async function sendSyncRequest(request: SyncRequest): Promise<SyncStatus> {
+function formatSyncSummary(
+  status: SyncStatus,
+  copy: PopupCopy,
+  locale: "zh-CN" | "en",
+): string {
+  if (status.syncing) return copy.syncing(status.pendingCount);
+  if (status.error) return copy.syncFailed(status.pendingCount);
+  if (status.pendingCount > 0) return copy.pendingSync(status.pendingCount);
+  if (status.lastSyncedAt) {
+    return copy.syncedAt(new Date(status.lastSyncedAt).toLocaleString(locale));
+  }
+  return copy.awaitingFirstSync;
+}
+
+async function sendSyncRequest(request: SyncRequest, fallbackError: string): Promise<SyncStatus> {
+  if (typeof chrome === "undefined" || !chrome.runtime?.sendMessage) {
+    throw new Error(fallbackError);
+  }
   const response = await chrome.runtime.sendMessage(request) as StorageResponse<SyncStatus> | undefined;
-  if (!response?.ok) throw new Error(response?.error ?? "同步服务暂不可用。");
+  if (!response?.ok) throw new Error(response?.error ?? fallbackError);
   return response.data;
 }
 
-function renderStatus(state: LoadState) {
+function renderStatus(state: LoadState, copy: PopupCopy) {
   if (state.status === "loading") {
-    return <p className="lc-popup__muted">正在读取当前页状态……</p>;
+    return <p className="lc-popup__muted">{copy.readingPage}</p>;
   }
 
   if (state.status === "unavailable") {
@@ -209,9 +258,9 @@ function renderStatus(state: LoadState) {
   if (state.page.disabled) {
     return (
       <div>
-        <div className="lc-popup__disabled-state">已禁用</div>
+        <div className="lc-popup__disabled-state">{copy.disabled}</div>
         <p className="lc-popup__muted">
-          {state.page.hostname ? `${state.page.hostname} · 此域名不显示划线入口` : "此域名不显示划线入口"}
+          {state.page.hostname ? `${state.page.hostname} · ${copy.siteDisabled}` : copy.siteDisabled}
         </p>
         {state.page.title ? <p className="lc-popup__title" title={state.page.title}>{state.page.title}</p> : null}
       </div>
@@ -221,33 +270,36 @@ function renderStatus(state: LoadState) {
   return (
     <div>
       <div className="lc-popup__count">{count}</div>
-      <p className="lc-popup__muted">当前页高亮数量</p>
+      <p className="lc-popup__muted">{copy.highlightCount}</p>
       {state.page.title ? <p className="lc-popup__title" title={state.page.title}>{state.page.title}</p> : null}
     </div>
   );
 }
 
-async function loadCurrentPageStatus(): Promise<LoadState> {
+async function loadCurrentPageStatus(copy: PopupCopy): Promise<LoadState> {
+  if (typeof chrome === "undefined" || !chrome.tabs?.query) {
+    return { status: "unavailable", message: copy.scriptUnavailable };
+  }
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
   if (!tab?.id) {
-    return { status: "unavailable", message: "未找到当前标签页。" };
+    return { status: "unavailable", message: copy.tabNotFound };
   }
 
   try {
     const page = (await chrome.tabs.sendMessage(tab.id, { type: "LIUCAI_GET_PAGE_STATUS" })) as PageStatusResponse | undefined;
     if (!page?.ok) {
-      return { status: "unavailable", message: page?.error ?? "当前页面暂不可读取。" };
+      return { status: "unavailable", message: page?.error ?? copy.pageUnavailable };
     }
     return { status: "ready", page };
   } catch {
-    return { status: "unavailable", message: "当前页面未注入六彩脚本，请在普通网页中使用。" };
+    return { status: "unavailable", message: copy.scriptUnavailable };
   }
 }
 
-async function setCurrentSiteDisabled(disabled: boolean): Promise<PageStatus> {
+async function setCurrentSiteDisabled(disabled: boolean, copy: PopupCopy): Promise<PageStatus> {
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
   if (!tab?.id) {
-    throw new Error("未找到当前标签页。");
+    throw new Error(copy.tabNotFound);
   }
 
   const page = (await chrome.tabs.sendMessage(tab.id, {
@@ -256,7 +308,7 @@ async function setCurrentSiteDisabled(disabled: boolean): Promise<PageStatus> {
   })) as PageStatusResponse | undefined;
 
   if (!page?.ok) {
-    throw new Error(page?.error ?? "网站设置更新失败。");
+    throw new Error(page?.error ?? copy.siteUpdateFailed);
   }
 
   return page;

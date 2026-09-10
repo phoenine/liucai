@@ -1,0 +1,330 @@
+:root {
+  color: #111827;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-synthesis: none;
+}
+
+body {
+  background: #f8fafc;
+  margin: 0;
+  min-width: 320px;
+}
+
+button,
+input {
+  font: inherit;
+}
+
+.lc-options {
+  margin: 0 auto;
+  max-width: 720px;
+  padding: 56px 24px 40px;
+}
+
+.lc-options__header {
+  align-items: flex-start;
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 28px;
+  min-height: 72px;
+}
+
+.lc-options__brand {
+  align-items: flex-start;
+  display: flex;
+  gap: 14px;
+}
+
+.lc-options__logo {
+  align-items: center;
+  background: #0f172a;
+  border-radius: 16px;
+  color: #ffffff;
+  display: flex;
+  flex: 0 0 auto;
+  font-size: 23px;
+  font-weight: 800;
+  height: 48px;
+  justify-content: center;
+  width: 48px;
+}
+
+.lc-options__eyebrow {
+  color: #475569;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.3;
+  margin: 0 0 3px;
+}
+
+.lc-options h1 {
+  color: #0f172a;
+  font-size: 28px;
+  letter-spacing: -0.035em;
+  line-height: 1.08;
+  margin: 0;
+}
+
+.lc-options__intro {
+  color: #64748b;
+  font-size: 14px;
+  line-height: 1.5;
+  margin: 7px 0 0;
+}
+
+.lc-options__save-status {
+  align-items: center;
+  color: #64748b;
+  display: flex;
+  font-size: 13px;
+  font-weight: 700;
+  gap: 6px;
+  min-height: 28px;
+  padding-top: 4px;
+}
+
+.lc-options__save-status[data-state="saved"] {
+  color: #16a34a;
+}
+
+.lc-options__save-status[data-state="failed"] {
+  color: #b91c1c;
+}
+
+.lc-options__retry {
+  background: transparent;
+  border: 0;
+  color: inherit;
+  cursor: pointer;
+  font-weight: 800;
+  padding: 4px 0 4px 3px;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.lc-options__retry:focus-visible {
+  border-radius: 4px;
+  outline: 2px solid currentColor;
+  outline-offset: 2px;
+}
+
+.lc-options__notice {
+  background: #fff7ed;
+  border: 1px solid #fed7aa;
+  border-radius: 12px;
+  color: #9a3412;
+  font-size: 13px;
+  line-height: 1.5;
+  margin-bottom: 14px;
+  padding: 11px 13px;
+}
+
+.lc-options__section {
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 16px;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.06);
+  padding: 20px;
+}
+
+.lc-options__section + .lc-options__section {
+  margin-top: 14px;
+}
+
+.lc-options__section--compact {
+  padding-bottom: 19px;
+}
+
+.lc-options__section-heading {
+  align-items: flex-start;
+  display: flex;
+  gap: 11px;
+}
+
+.lc-options__section-icon {
+  align-items: center;
+  background: #f1f5f9;
+  border-radius: 10px;
+  color: #475569;
+  display: flex;
+  flex: 0 0 auto;
+  height: 36px;
+  justify-content: center;
+  width: 36px;
+}
+
+.lc-options h2 {
+  color: #0f172a;
+  font-size: 15px;
+  line-height: 1.35;
+  margin: 0 0 3px;
+}
+
+.lc-options__section-heading p {
+  color: #64748b;
+  font-size: 13px;
+  line-height: 1.5;
+  margin: 0;
+}
+
+.lc-options__color-fieldset {
+  border: 0;
+  margin: 22px 0 0;
+  min-width: 0;
+  padding: 0;
+}
+
+.lc-options__color-fieldset:disabled {
+  opacity: 0.65;
+}
+
+.lc-options__color-fieldset legend {
+  color: #1e293b;
+  font-size: 13px;
+  font-weight: 700;
+  padding: 0;
+}
+
+.lc-options__field-help {
+  color: #64748b;
+  font-size: 12px;
+  line-height: 1.5;
+  margin: 5px 0 12px;
+}
+
+.lc-options__color-grid {
+  display: grid;
+  gap: 9px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.lc-options__language-grid {
+  display: grid;
+  gap: 9px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.lc-options__color-option,
+.lc-options__language-option {
+  align-items: center;
+  background: #ffffff;
+  border: 1px solid #dbe2ea;
+  border-radius: 13px;
+  cursor: pointer;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: 28px minmax(0, 1fr) 21px;
+  min-height: 72px;
+  padding: 11px 12px;
+  transition: border-color 160ms ease, box-shadow 160ms ease, transform 160ms ease;
+}
+
+.lc-options__language-option {
+  grid-template-columns: minmax(0, 1fr) 21px;
+}
+
+.lc-options__color-option:hover,
+.lc-options__language-option:hover {
+  border-color: #94a3b8;
+  transform: translateY(-1px);
+}
+
+.lc-options__color-option:has(input:focus-visible),
+.lc-options__language-option:has(input:focus-visible) {
+  box-shadow: 0 0 0 3px rgba(100, 116, 139, 0.18);
+  outline: 2px solid #475569;
+  outline-offset: 2px;
+}
+
+.lc-options__color-option[data-selected="true"],
+.lc-options__language-option[data-selected="true"] {
+  border-color: #64748b;
+  box-shadow: 0 5px 16px rgba(15, 23, 42, 0.09);
+}
+
+.lc-options__color-option input,
+.lc-options__language-option input {
+  height: 1px;
+  opacity: 0;
+  position: absolute;
+  width: 1px;
+}
+
+.lc-options__color-swatch {
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  border-radius: 999px;
+  display: block;
+  height: 26px;
+  width: 26px;
+}
+
+.lc-options__color-swatch[data-color="gold"] { background: #ffea70; }
+.lc-options__color-swatch[data-color="mint"] { background: #4df4c9; }
+.lc-options__color-swatch[data-color="coral"] { background: #ffafa1; }
+
+.lc-options__color-copy,
+.lc-options__language-copy {
+  min-width: 0;
+}
+
+.lc-options__color-copy strong,
+.lc-options__color-copy small,
+.lc-options__language-copy strong,
+.lc-options__language-copy small {
+  display: block;
+}
+
+.lc-options__color-copy strong,
+.lc-options__language-copy strong {
+  color: #1e293b;
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.lc-options__color-copy small,
+.lc-options__language-copy small {
+  color: #64748b;
+  font-size: 11px;
+  line-height: 1.35;
+  margin-top: 3px;
+}
+
+.lc-options__color-check {
+  color: #334155;
+  opacity: 0;
+}
+
+.lc-options__color-option[data-selected="true"] .lc-options__color-check,
+.lc-options__language-option[data-selected="true"] .lc-options__color-check {
+  opacity: 1;
+}
+
+.lc-options__footer {
+  color: #94a3b8;
+  display: flex;
+  font-size: 12px;
+  justify-content: space-between;
+  padding: 18px 4px 0;
+}
+
+@media (max-width: 680px) {
+  .lc-options {
+    padding: 28px 16px 30px;
+  }
+
+  .lc-options__header {
+    gap: 14px;
+  }
+
+  .lc-options__color-grid,
+  .lc-options__language-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lc-options__color-option,
+  .lc-options__language-option {
+    transition: none;
+  }
+}
