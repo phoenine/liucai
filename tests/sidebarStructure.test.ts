@@ -33,7 +33,7 @@ test("sidebar presents export action below page title while close remains in the
   const closeIndex = sidebar.indexOf("liucai-sidebar__close");
   const pageTitleIndex = sidebar.indexOf("liucai-sidebar__page-title");
   const exportPanelIndex = sidebar.indexOf("liucai-sidebar__export");
-  const exportLabelIndex = sidebar.indexOf("导出 Obsidian Markdown");
+  const exportLabelIndex = sidebar.indexOf("props.copy.exportTitle");
   const dividerIndex = sidebar.indexOf("liucai-sidebar__divider");
 
   assert.ok(closeIndex >= 0);

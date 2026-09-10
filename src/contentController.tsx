@@ -25,6 +25,16 @@ import {
   formatObsidianPageExport,
 } from "./obsidianExport";
 import { getRangeDisplayText } from "./rangeDisplayText";
+import {
+  getContentCopy,
+  resolveInterfaceLocale,
+  type ContentCopy,
+  type ResolvedLocale,
+} from "./localization";
+import {
+  normalizePreferences,
+  PREFERENCES_STORAGE_KEY,
+} from "./preferences";
 import { isHostnameDisabled, setHostnameDisabled } from "./sitePreferences";
 import {
   addHighlight,
@@ -66,6 +76,9 @@ export class ContentController {
   private sidebarOpen = false;
   private pagePromise: Promise<PageRecord> | null = null;
   private pageActive = false;
+  private defaultAnnotationColor: HighlightColor = "gold";
+  private interfaceLocale: ResolvedLocale = resolveInterfaceLocale("auto");
+  private contentCopy: ContentCopy = getContentCopy(this.interfaceLocale);
   private locationTimer: number | null = null;
   private disposed = false;
 
@@ -110,6 +123,7 @@ export class ContentController {
       return;
     }
 
+    await this.refreshPreferences();
     await this.getCurrentPage();
     await this.restoreHighlights();
     await this.refreshSidebarData();
@@ -187,6 +201,20 @@ export class ContentController {
   ): void => {
     if (areaName !== "local") {
       return;
+    }
+
+    if (changes[PREFERENCES_STORAGE_KEY]) {
+      const languageChanged = this.applyPreferences(
+        changes[PREFERENCES_STORAGE_KEY].newValue,
+      );
+      if (languageChanged && this.pageActive) {
+        this.mounts.hideToolbar();
+        this.mounts.hidePopover();
+        void this.transitions
+          .run(() => this.refreshSidebarData())
+          .catch((error) => this.reportError("language preference sync", error));
+      }
+      if (Object.keys(changes).length === 1) return;
     }
 
     const task = changes["liucai.sync.changedAt"]
@@ -364,20 +392,49 @@ export class ContentController {
       164,
       "liucai-toolbar--selection",
       <SelectionToolbar
+        copy={this.contentCopy}
         onColor={(color) => this.runAsync(
           "create highlight",
           () => this.createHighlight(color, { openEditor: false }),
         )}
         onNote={() => this.runAsync(
           "create note highlight",
-          () => this.createHighlight("gold", { openEditor: true, focus: "note" }),
+          () => this.createHighlight(
+            this.defaultAnnotationColor,
+            { openEditor: true, focus: "note" },
+          ),
         )}
         onTags={() => this.runAsync(
           "create tagged highlight",
-          () => this.createHighlight("gold", { openEditor: true, focus: "tags" }),
+          () => this.createHighlight(
+            this.defaultAnnotationColor,
+            { openEditor: true, focus: "tags" },
+          ),
         )}
       />,
     );
+  }
+
+  private async refreshPreferences(): Promise<void> {
+    try {
+      const stored = await chrome.storage.local.get(PREFERENCES_STORAGE_KEY);
+      this.applyPreferences(stored[PREFERENCES_STORAGE_KEY]);
+    } catch (error) {
+      this.defaultAnnotationColor = "gold";
+      this.interfaceLocale = resolveInterfaceLocale("auto");
+      this.contentCopy = getContentCopy(this.interfaceLocale);
+      this.reportError("preferences load", error);
+    }
+  }
+
+  private applyPreferences(value: unknown): boolean {
+    const preferences = normalizePreferences(value);
+    const nextLocale = resolveInterfaceLocale(preferences.general.interfaceLanguage);
+    const languageChanged = nextLocale !== this.interfaceLocale;
+    this.defaultAnnotationColor = preferences.highlights.defaultAnnotationColor;
+    this.interfaceLocale = nextLocale;
+    this.contentCopy = getContentCopy(nextLocale);
+    return languageChanged;
   }
 
   private showHighlightToolbar(
@@ -391,6 +448,7 @@ export class ContentController {
       164,
       "liucai-toolbar--highlight",
       <ExistingHighlightToolbar
+        copy={this.contentCopy}
         record={record}
         onColor={(color) => this.runAsync(
           "update highlight color",
@@ -421,6 +479,7 @@ export class ContentController {
       left,
       top,
       <EditorPopover
+        copy={this.contentCopy}
         record={safeRecord}
         focus={focus}
         onCancel={() => this.mounts.hidePopover()}
@@ -444,6 +503,7 @@ export class ContentController {
   private renderMiniSidebar(count: number): void {
     this.mounts.renderMiniSidebar(
       <MiniSidebarLauncher
+        copy={this.contentCopy}
         count={count}
         open={this.sidebarOpen}
         onToggle={() => this.runAsync("toggle sidebar", () => this.toggleSidebar())}
@@ -466,6 +526,7 @@ export class ContentController {
   private renderSidebar(records: HighlightRecord[]): void {
     this.mounts.renderSidebar(
       <HighlightSidebar
+        copy={this.contentCopy}
         pageTitle={document.title}
         records={records}
         onClose={() => {

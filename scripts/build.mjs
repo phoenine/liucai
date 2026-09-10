@@ -7,13 +7,13 @@ import { fileURLToPath } from "node:url";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const dist = resolve(root, "dist");
-const inlineIifeOutput = {
+const inlineIifeOutput = (stylesheet) => ({
   inlineDynamicImports: true,
   assetFileNames: (assetInfo) => {
-    if (assetInfo.name?.endsWith(".css")) return "liucai.css";
+    if (assetInfo.name?.endsWith(".css")) return stylesheet;
     return "assets/[name][extname]";
   },
-};
+});
 
 await rm(dist, { recursive: true, force: true });
 await mkdir(dist, { recursive: true });
@@ -36,7 +36,7 @@ await build({
       fileName: () => "content.js",
     },
     rollupOptions: {
-      output: inlineIifeOutput,
+      output: inlineIifeOutput("content-bundle.css"),
     },
   },
 });
@@ -52,7 +52,7 @@ await build({
       fileName: () => "background.js",
     },
     rollupOptions: {
-      output: inlineIifeOutput,
+      output: inlineIifeOutput("background-bundle.css"),
     },
   },
 });
@@ -68,17 +68,34 @@ await build({
       fileName: () => "popup.js",
     },
     rollupOptions: {
-      output: inlineIifeOutput,
+      output: inlineIifeOutput("liucai.css"),
     },
   },
 });
 
-await verifyPopupCssContract();
+await build({
+  ...base,
+  build: {
+    ...base.build,
+    lib: {
+      entry: resolve(root, "src/options.tsx"),
+      name: "LiucaiOptions",
+      formats: ["iife"],
+      fileName: () => "options.js",
+    },
+    rollupOptions: {
+      output: inlineIifeOutput("options.css"),
+    },
+  },
+});
 
-async function verifyPopupCssContract() {
-  const popupHtml = await readFile(resolve(dist, "popup.html"), "utf8");
-  if (!popupHtml.includes('href="liucai.css"')) {
-    throw new Error('popup.html must reference the deterministic popup stylesheet: href="liucai.css"');
+await verifyHtmlCssContract("popup.html", "liucai.css");
+await verifyHtmlCssContract("options.html", "options.css");
+
+async function verifyHtmlCssContract(htmlFilename, cssFilename) {
+  const html = await readFile(resolve(dist, htmlFilename), "utf8");
+  if (!html.includes(`href="${cssFilename}"`)) {
+    throw new Error(`${htmlFilename} must reference the deterministic stylesheet: href="${cssFilename}"`);
   }
-  await access(resolve(dist, "liucai.css"), constants.R_OK);
+  await access(resolve(dist, cssFilename), constants.R_OK);
 }
