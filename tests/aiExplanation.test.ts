@@ -5,12 +5,13 @@ import {
   generateExample,
   parseAiExplanation,
   testAiConnection,
+  AI_CONCEPT_LIMIT,
+  AI_EXPLANATION_LIMIT,
 } from "../src/aiExplanation.ts";
 
 const explanation = {
   concept: "RAG",
-  summary: "A model consults external knowledge.",
-  contextualMeaning: "It grounds the answer in the article's documents.",
+  explanation: "A model consults **external knowledge** to ground its answer in the article's documents.",
 };
 
 test("parses Responses API output_text and nested output content", () => {
@@ -21,11 +22,57 @@ test("parses Responses API output_text and nested output content", () => {
   assert.throws(() => parseAiExplanation({ output_text: "not json" }), /AI_INVALID_RESPONSE/);
 });
 
+test("keeps reading the output array when output_text is an empty string", () => {
+  // OpenAI-compatible gateways often send both fields, with output_text empty.
+  assert.deepEqual(parseAiExplanation({
+    output_text: "",
+    output: [{ content: [{ type: "output_text", text: JSON.stringify(explanation) }] }],
+  }), explanation);
+});
+
+test("falls back past whitespace output_text and invalid prose braces", () => {
+  assert.deepEqual(parseAiExplanation({
+    output_text: "   ",
+    output: [{ content: [{ text: JSON.stringify(explanation) }] }],
+  }), explanation);
+  assert.deepEqual(parseAiExplanation({
+    output_text: `A set looks like {a, b}. Result: ${JSON.stringify(explanation)}`,
+  }), explanation);
+});
+
+test("does not split a Unicode code point at the Chinese concept limit", () => {
+  const result = parseAiExplanation({
+    output_text: JSON.stringify({
+      concept: `${"字".repeat(AI_CONCEPT_LIMIT["zh-CN"] - 1)}😀尾`,
+      explanation: "说明",
+    }),
+  }, "zh-CN");
+
+  assert.equal(Array.from(result.concept).length, AI_CONCEPT_LIMIT["zh-CN"]);
+  assert.equal(result.concept.endsWith("😀"), true);
+});
+
+test("reads JSON that the model wrapped in prose", () => {
+  const body = JSON.stringify(explanation);
+
+  assert.deepEqual(parseAiExplanation({ output_text: `Here is the JSON:\n${body}` }), explanation);
+  assert.deepEqual(parseAiExplanation({ output_text: `${body}\nHope that helps!` }), explanation);
+  assert.deepEqual(parseAiExplanation({ output_text: `Sure! ${body} Done.` }), explanation);
+  // Braces inside strings must not end the object early.
+  assert.deepEqual(
+    parseAiExplanation({
+      output_text: `note: ${JSON.stringify({ ...explanation, concept: "a } b" })}`,
+    }),
+    { ...explanation, concept: "a } b" },
+  );
+});
+
 test("calls the configured LM Studio Responses endpoint without inventing an auth header", async () => {
   let capturedUrl = "";
   let capturedInit: RequestInit | undefined;
   const result = await explainSelection({
     type: "LIUCAI_AI_EXPLAIN",
+    requestId: "request-1",
     selectedText: "RAG",
     contextText: "This system uses RAG for its answers.",
     locale: "en",
@@ -64,6 +111,7 @@ test("rejects signed-out and incomplete configurations before making a request",
   };
   await assert.rejects(() => explainSelection({
     type: "LIUCAI_AI_EXPLAIN",
+    requestId: "request-1",
     selectedText: "term",
     contextText: "context",
     locale: "zh-CN",
@@ -75,6 +123,7 @@ test("rejects signed-out and incomplete configurations before making a request",
 
   await assert.rejects(() => explainSelection({
     type: "LIUCAI_AI_EXPLAIN",
+    requestId: "request-2",
     selectedText: "term",
     contextText: "context",
     locale: "en",
@@ -89,6 +138,7 @@ test("sends a bearer token only when the selected provider has one", async () =>
   let authorization = "";
   await explainSelection({
     type: "LIUCAI_AI_EXPLAIN",
+    requestId: "request-1",
     selectedText: "term",
     contextText: "context",
     locale: "en",
@@ -111,6 +161,7 @@ test("generates examples as a separate low-reasoning request", async () => {
   let requestBody: { reasoning: { effort: string }; max_output_tokens: number } | undefined;
   const result = await generateExample({
     type: "LIUCAI_AI_EXAMPLE",
+    requestId: "request-1",
     selectedText: "RAG",
     contextText: "RAG is used here.",
     concept: "Retrieval augmented generation",
@@ -134,6 +185,7 @@ test("preserves formatting in generated code examples", async () => {
   const codeExample = "```ts\nconst result = await run();\nconsole.log(result);\n```";
   const result = await generateExample({
     type: "LIUCAI_AI_EXAMPLE",
+    requestId: "request-1",
     selectedText: "async/await",
     contextText: "Use async/await for asynchronous code.",
     concept: "async/await",
@@ -152,6 +204,7 @@ test("preserves formatting in generated code examples", async () => {
 test("rejects a reasoning-only example response with no final answer", async () => {
   await assert.rejects(() => generateExample({
     type: "LIUCAI_AI_EXAMPLE",
+    requestId: "request-1",
     selectedText: "提示词链",
     contextText: "提示词链可以调用外部工具。",
     concept: "提示词链",
@@ -175,13 +228,11 @@ test("hard-limits light explanation length after model output", () => {
   const result = parseAiExplanation({
     output_text: JSON.stringify({
       concept: "一二三四五六七八九十一二三四五六七八九十一二三",
-      summary: "说".repeat(80),
-      contextualMeaning: "文".repeat(150),
+      explanation: "文".repeat(150),
     }),
   }, "zh-CN");
-  assert.equal(result.concept.length, 20);
-  assert.equal(result.summary.length, 60);
-  assert.equal(result.contextualMeaning.length, 120);
+  assert.equal(result.concept.length, AI_CONCEPT_LIMIT["zh-CN"]);
+  assert.equal(result.explanation.length, AI_EXPLANATION_LIMIT["zh-CN"]);
 });
 
 test("connection test requires a real model response even when an unsupported endpoint returns 200", async () => {

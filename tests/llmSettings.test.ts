@@ -90,3 +90,19 @@ test("adds the LM Studio OpenAI-compatible v1 path to a server origin", () => {
     lmStudio: { baseUrl: "http://localhost:1234/proxy/v1/" },
   }).lmStudio.baseUrl, "http://localhost:1234/proxy/v1");
 });
+
+test("refuses model endpoints that would send the API key somewhere unsafe", () => {
+  const complete = (baseUrl: string): boolean => isLlmSettingsComplete(normalizeLlmSettings({
+    provider: "lm-studio",
+    lmStudio: { baseUrl, model: "local-model", apiKey: "secret" },
+  }));
+
+  // Plain http to a remote host would carry the key in clear text.
+  assert.equal(complete("http://evil.example/v1"), false);
+  // Credentials embedded in the URL would leak into logs and error messages.
+  assert.equal(complete("https://user:pass@evil.example/v1"), false);
+  // Local servers over http, and any https endpoint, stay allowed.
+  assert.equal(complete("http://localhost:1234/v1"), true);
+  assert.equal(complete("http://127.0.0.1:1234/v1"), true);
+  assert.equal(complete("https://models.example/v1"), true);
+});

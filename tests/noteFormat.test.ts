@@ -1,27 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { continueNoteList, parseNoteBlocks } from "../src/noteFormat.ts";
-
-test("preserves consecutive plain lines as one paragraph", () => {
-  assert.deepEqual(parseNoteBlocks("第一行\n第二行"), [
-    { type: "paragraph", lines: ["第一行", "第二行"] },
-  ]);
-});
-
-test("parses ordered and unordered note lists", () => {
-  assert.deepEqual(parseNoteBlocks("3. 第三项\n4. 第四项\n\n- 检查代码\n- 补充测试"), [
-    { type: "ordered-list", start: 3, items: ["第三项", "第四项"] },
-    { type: "unordered-list", items: ["检查代码", "补充测试"] },
-  ]);
-});
-
-test("separates mixed note blocks without emitting empty blocks", () => {
-  assert.deepEqual(parseNoteBlocks("结论\n\n1. 定位问题\n2. 修复问题\n\n补充说明"), [
-    { type: "paragraph", lines: ["结论"] },
-    { type: "ordered-list", start: 1, items: ["定位问题", "修复问题"] },
-    { type: "paragraph", lines: ["补充说明"] },
-  ]);
-});
+import { continueNoteList } from "../src/noteFormat.ts";
 
 test("continues ordered and unordered lists at the end of an item", () => {
   assert.deepEqual(continueNoteList("1. 定位问题", 7, 7), {

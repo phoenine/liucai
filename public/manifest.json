@@ -3,7 +3,7 @@
   "name": "六彩 Liucai",
   "version": "1.0.0",
   "description": "个人自用的本地网页高亮与批注 Chrome 插件。",
-  "permissions": ["storage", "activeTab", "alarms"],
+  "permissions": ["storage", "unlimitedStorage", "activeTab", "alarms"],
   "host_permissions": ["<all_urls>"],
   "icons": {
     "16": "icon16.png",

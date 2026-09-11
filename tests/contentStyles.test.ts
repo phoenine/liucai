@@ -1,13 +1,40 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
+import {
+  HIGHLIGHT_ACCENT,
+  HIGHLIGHT_MARKER,
+  HIGHLIGHT_SOFT,
+} from "../src/highlightTooltip.ts";
 
 test("uses a light matching background for each sidebar highlight card", async () => {
   const css = await readFile(new URL("../public/content.css", import.meta.url), "utf8");
 
-  assert.match(css, /\.liucai-sidebar-item\[data-color="gold"\]\s*\{\s*background:\s*#fffbe6;/i);
-  assert.match(css, /\.liucai-sidebar-item\[data-color="mint"\]\s*\{\s*background:\s*#ecfff9;/i);
-  assert.match(css, /\.liucai-sidebar-item\[data-color="coral"\]\s*\{\s*background:\s*#fff1ee;/i);
+  assert.match(css, /\.liucai-sidebar-item\[data-color\]\s*\{\s*background:\s*var\(--liucai-soft\);/);
+  assert.match(css, /\.liucai-sidebar-item\[data-color\] \.liucai-sidebar-item__line,\s*\.liucai-sidebar-item\[data-color\] \.liucai-sidebar-item__dot\s*\{[^}]*background:\s*var\(--liucai-accent\);/s);
+  for (const color of Object.keys(HIGHLIGHT_SOFT) as Array<keyof typeof HIGHLIGHT_SOFT>) {
+    assert.match(
+      css,
+      new RegExp(
+        String.raw`\.liucai-highlight-tooltip\[data-color="${color}"\],\s*` +
+          String.raw`\.liucai-sidebar-item\[data-color="${color}"\]\s*\{` +
+          String.raw`[^}]*--liucai-soft:\s*${HIGHLIGHT_SOFT[color]};` +
+          String.raw`[^}]*--liucai-accent:\s*${HIGHLIGHT_ACCENT[color]};` +
+          String.raw`[^}]*--liucai-marker:\s*${HIGHLIGHT_MARKER[color]};`,
+        "i",
+      ),
+    );
+  }
+});
+
+test("keeps wrapped article highlights as one marker instead of cloned chips", async () => {
+  const css = await readFile(new URL("../public/content.css", import.meta.url), "utf8");
+  const rule = css.match(/\.liucai-highlight\s*\{[^}]*\}/s)?.[0];
+
+  assert.ok(rule);
+  assert.doesNotMatch(rule, /box-decoration-break:\s*clone/i);
+  assert.doesNotMatch(rule, /padding:\s*0 1px/);
+  assert.match(rule, /padding:\s*0\.08em 0;/);
 });
 
 test("shows complete highlight text and notes in sidebar cards", async () => {
@@ -29,12 +56,13 @@ test("preserves semantic newlines in sidebar highlight text", async () => {
   assert.match(textRule, /white-space:\s*pre-wrap;/);
 });
 
-test("styles note paragraphs and Markdown-lite lists", async () => {
+test("styles shared Markdown paragraphs, lists, and code", async () => {
   const css = await readFile(new URL("../public/content.css", import.meta.url), "utf8");
 
-  assert.match(css, /\.liucai-note-paragraph\s*\{[^}]*white-space:\s*pre-wrap;/s);
-  assert.match(css, /\.liucai-note-list\s*\{[^}]*padding-left:/s);
-  assert.match(css, /\.liucai-note-list li\s*\{[^}]*margin-top:/s);
+  assert.match(css, /\.liucai-markdown p\s*\{[^}]*white-space:\s*pre-wrap;/s);
+  assert.match(css, /\.liucai-markdown :is\(ul, ol\)\s*\{[^}]*padding-left:/s);
+  assert.match(css, /\.liucai-markdown li\s*\{[^}]*margin-top:/s);
+  assert.match(css, /\.liucai-markdown pre\s*\{[^}]*overflow-x:\s*auto;/s);
 });
 
 test("keeps tooltip notes and tags consistent with sidebar cards", async () => {
@@ -44,12 +72,18 @@ test("keeps tooltip notes and tags consistent with sidebar cards", async () => {
 
   assert.ok(noteRule);
   assert.ok(tagRule);
-  assert.match(noteRule, /background:\s*#fff7ed;/i);
-  assert.match(noteRule, /color:\s*#92400e;/i);
+  assert.match(css, /\.liucai-highlight-tooltip\s*\{[^}]*pointer-events:\s*auto;/s);
+  assert.match(noteRule, /background:\s*transparent;/i);
+  assert.match(noteRule, /pointer-events:\s*none;/i);
+  assert.match(noteRule, /color:\s*#3f4147;/i);
   assert.match(noteRule, /font:\s*12px\//i);
-  assert.match(tagRule, /background:\s*#eff6ff;/i);
-  assert.match(tagRule, /color:\s*#2563eb;/i);
+  assert.match(tagRule, /background:\s*#edf2f7;/i);
+  assert.match(tagRule, /color:\s*#4f6b8a;/i);
   assert.match(tagRule, /font:\s*700 10px\//i);
+  assert.match(
+    css,
+    /\.liucai-highlight-tooltip \.liucai-markdown li::marker,\s*\.liucai-sidebar-item__note \.liucai-markdown li::marker\s*\{[^}]*color:\s*var\(--liucai-marker\);/s,
+  );
 });
 
 test("styles sidebar action feedback and disabled states", async () => {
@@ -81,17 +115,17 @@ test("uses the sourced Phosphor chat icon without adding a DOM component", async
 test("wraps unbroken highlight and note text inside its container", async () => {
   const css = await readFile(new URL("../public/content.css", import.meta.url), "utf8");
   const textRule = css.match(/\.liucai-sidebar-item__text\s*\{[^}]*\}/s)?.[0];
-  const paragraphRule = css.match(/\.liucai-note-paragraph\s*\{[^}]*\}/s)?.[0];
+  const markdownRule = css.match(/\.liucai-markdown\s*\{[^}]*\}/s)?.[0];
   const listItemRules = Array.from(
-    css.matchAll(/\.liucai-note-list li\s*\{[^}]*\}/gs),
+    css.matchAll(/\.liucai-markdown li\s*\{[^}]*\}/gs),
     (match) => match[0],
   );
 
   assert.ok(textRule);
-  assert.ok(paragraphRule);
+  assert.ok(markdownRule);
   assert.match(textRule, /min-width:\s*0;/);
   assert.match(textRule, /overflow-wrap:\s*anywhere;/);
-  assert.match(paragraphRule, /overflow-wrap:\s*anywhere;/);
+  assert.match(markdownRule, /overflow-wrap:\s*anywhere;/);
   assert.equal(
     listItemRules.some((rule) => /overflow-wrap:\s*anywhere;/.test(rule)),
     true,
@@ -147,7 +181,7 @@ test("keeps the original vertical rhythm between note, tags, and card actions", 
   assert.ok(tagsRule);
   assert.ok(actionsRule);
   assert.match(noteRule, /margin:\s*7px 0 0;/);
-  assert.match(tagsRule, /margin:\s*11px 0 0;/);
+  assert.match(tagsRule, /margin:\s*8px 0 0;/);
   assert.match(actionsRule, /margin-top:\s*8px;/);
   assert.doesNotMatch(css, /\.liucai-sidebar-item__footer\s*\{/);
 });

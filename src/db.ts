@@ -1,4 +1,5 @@
 import Dexie, { type Table } from "dexie";
+import { MAX_NOTE_LENGTH } from "./aiNote";
 import { generateUuid } from "./id";
 import type {
   HighlightDeletePayload,
@@ -45,6 +46,9 @@ class LiucaiDatabase extends Dexie {
 
 export const db = new LiucaiDatabase();
 
+/** Failures allowed before a mutation stops being retried in the ordinary batch. */
+const MAX_SYNC_ATTEMPTS = 8;
+
 export async function upsertPage(canonicalUrl: string, originalUrl: string, title: string): Promise<PageRecord> {
   return db.transaction("rw", db.pages, db.outbox, async () => {
     const now = new Date().toISOString();
@@ -90,7 +94,11 @@ export async function getActiveHighlights(canonicalUrl: string): Promise<Highlig
 }
 
 export function normalizeHighlightRecord(record: HighlightRecord): HighlightRecord {
-  return { ...record, tags: Array.isArray(record.tags) ? record.tags : [] };
+  return {
+    ...record,
+    note: typeof record.note === "string" ? record.note : "",
+    tags: Array.isArray(record.tags) ? record.tags : [],
+  };
 }
 
 export async function getHighlight(id: string): Promise<HighlightRecord | undefined> {
@@ -100,6 +108,7 @@ export async function getHighlight(id: string): Promise<HighlightRecord | undefi
 
 export async function addHighlight(record: HighlightRecord): Promise<void> {
   const normalized = normalizeHighlightRecord(record);
+  assertNoteWithinLimit(normalized.note);
   await db.transaction("rw", db.highlights, db.outbox, async () => {
     await db.highlights.add(normalized);
     await enqueueSnapshot("highlight", normalized);
@@ -108,54 +117,28 @@ export async function addHighlight(record: HighlightRecord): Promise<void> {
 
 export async function putHighlight(record: HighlightRecord): Promise<void> {
   const normalized = normalizeHighlightRecord(record);
+  assertNoteWithinLimit(normalized.note);
   await db.transaction("rw", db.highlights, db.outbox, async () => {
     await db.highlights.put(normalized);
     await enqueueSnapshot("highlight", normalized);
   });
 }
 
-export async function importLegacyRecords(
-  pages: PageRecord[],
-  highlights: HighlightRecord[],
-): Promise<void> {
-  await db.transaction("rw", db.pages, db.highlights, db.outbox, async () => {
-    const pageIds = new Map<string, string>();
-    for (const page of pages) {
-      const existing = await db.pages.where("canonicalUrl").equals(page.canonicalUrl).first();
-      pageIds.set(page.canonicalUrl, existing?.id ?? page.id);
-      if (!existing) {
-        await db.pages.put(page);
-        await enqueueSnapshot("page", page);
-      } else if (existing.updatedAt < page.updatedAt) {
-        const merged = { ...page, id: existing.id };
-        await db.pages.put(merged);
-        await enqueueSnapshot("page", merged);
-      }
-    }
-
-    for (const candidate of highlights) {
-      let pageId = pageIds.get(candidate.canonicalUrl);
-      if (!pageId) {
-        const page = await db.pages.where("canonicalUrl").equals(candidate.canonicalUrl).first();
-        pageId = page?.id;
-      }
-      const record = normalizeHighlightRecord({
-        ...candidate,
-        pageId: pageId ?? candidate.pageId,
-      });
-      const existing = await db.highlights.get(record.id);
-      if (!existing || existing.updatedAt < record.updatedAt) {
-        await db.highlights.put(record);
-        await enqueueSnapshot("highlight", record);
-      }
-    }
-  });
-}
-
+/**
+ * Pending mutations that are due to be sent.
+ *
+ * `now` is compared as a timestamp rather than as text. An ISO string for a far-future date
+ * starts with "+", which sorts *before* every ordinary date, so the text comparison silently
+ * inverted the "ignore the backoff" call that passes one.
+ * Mutations that keep failing are left out of the batch so one bad record cannot freeze the queue
+ * for everything behind it; `resetOutboxRetries` (the user-visible "sync now") puts them back in.
+ */
 export async function getOutboxBatch(limit = 100, now = new Date()): Promise<OutboxMutation[]> {
+  const cutoff = now.getTime();
   const records = await db.outbox.toArray();
   return records
-    .filter((record) => !record.nextAttemptAt || record.nextAttemptAt <= now.toISOString())
+    .filter((record) => (record.retryCount ?? 0) < MAX_SYNC_ATTEMPTS)
+    .filter((record) => !record.nextAttemptAt || Date.parse(record.nextAttemptAt) <= cutoff)
     .sort((left, right) => {
       if (left.entityType !== right.entityType) return left.entityType === "page" ? -1 : 1;
       return left.createdAt.localeCompare(right.createdAt) || left.mutationId.localeCompare(right.mutationId);
@@ -283,8 +266,11 @@ export async function recordSyncStateError(userId: string, message: string): Pro
 }
 
 async function applyRemotePage(payload: PageRecord): Promise<void> {
-  const page = pickPageFields(payload);
-  const canonicalMatch = await db.pages.where("canonicalUrl").equals(page.canonicalUrl).first();
+  const existing = await db.pages.get(payload.id);
+  const canonicalMatch = await db.pages.where("canonicalUrl").equals(payload.canonicalUrl).first();
+  const local = existing
+    ?? (canonicalMatch && canonicalMatch.id !== payload.id ? canonicalMatch : undefined);
+  const page = pickPageFields(payload, local);
   if (canonicalMatch && canonicalMatch.id !== page.id) {
     await db.highlights.where("pageId").equals(canonicalMatch.id).modify({ pageId: page.id });
     await db.pages.delete(canonicalMatch.id);
@@ -308,16 +294,27 @@ async function applyRemoteHighlightDelete(
   }));
 }
 
-function pickPageFields(payload: PageRecord): PageRecord {
+/**
+ * `createdAt` and `lastOpenedAt` are local facts: the server has no column for either, so the
+ * payload's copies are echoes of `updatedAt`. Writing those over the real values lost "recently
+ * opened" ordering and mixed `+00:00` in with the local `Z` format, which breaks text comparisons.
+ */
+function pickPageFields(payload: PageRecord, local?: PageRecord): PageRecord {
   return {
     id: payload.id,
     canonicalUrl: payload.canonicalUrl,
     originalUrl: payload.originalUrl,
     title: payload.title,
-    createdAt: payload.createdAt,
-    updatedAt: payload.updatedAt,
-    lastOpenedAt: payload.lastOpenedAt ?? payload.updatedAt,
+    createdAt: local?.createdAt ?? normalizeTimestamp(payload.createdAt),
+    updatedAt: normalizeTimestamp(payload.updatedAt),
+    lastOpenedAt: local?.lastOpenedAt ?? normalizeTimestamp(payload.lastOpenedAt ?? payload.updatedAt),
   };
+}
+
+/** One timestamp format everywhere, so ordering by string stays correct. */
+function normalizeTimestamp(value: string): string {
+  const parsed = Date.parse(value);
+  return Number.isNaN(parsed) ? value : new Date(parsed).toISOString();
 }
 
 function pickHighlightFields(payload: HighlightRecord): HighlightRecord {
@@ -338,6 +335,10 @@ function pickHighlightFields(payload: HighlightRecord): HighlightRecord {
 
 function cursorKey(userId: string): string {
   return `cursor:${userId}`;
+}
+
+function assertNoteWithinLimit(note: string): void {
+  if (note.length > MAX_NOTE_LENGTH) throw new Error("NOTE_TOO_LONG");
 }
 
 async function enqueueSnapshot(

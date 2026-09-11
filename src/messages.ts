@@ -1,4 +1,4 @@
-import type { HighlightRecord, PageRecord } from "./types";
+import type { HighlightRecord } from "./types";
 
 export const AI_AUTH_STATE_STORAGE_KEY = "liucai.ai.signedIn";
 
@@ -24,8 +24,7 @@ export interface SyncStatus {
 
 export interface AiExplanation {
   concept: string;
-  summary: string;
-  contextualMeaning: string;
+  explanation: string;
 }
 
 export interface AiExample {
@@ -34,6 +33,7 @@ export interface AiExample {
 
 export interface AiExplainRequest {
   type: "LIUCAI_AI_EXPLAIN";
+  requestId: string;
   selectedText: string;
   contextText: string;
   locale: "zh-CN" | "en";
@@ -41,6 +41,7 @@ export interface AiExplainRequest {
 
 export interface AiExampleRequest {
   type: "LIUCAI_AI_EXAMPLE";
+  requestId: string;
   selectedText: string;
   contextText: string;
   concept: string;
@@ -54,6 +55,11 @@ export interface AiTestConnectionRequest {
     model: string;
     apiKey: string;
   };
+}
+
+export interface AiCancelRequest {
+  type: "LIUCAI_AI_CANCEL";
+  requestId: string;
 }
 
 export interface PageStatus {
@@ -82,12 +88,7 @@ export type StorageRequest =
   | { type: "LIUCAI_STORAGE_GET_ACTIVE_HIGHLIGHTS"; canonicalUrl: string }
   | { type: "LIUCAI_STORAGE_GET_HIGHLIGHT"; id: string }
   | { type: "LIUCAI_STORAGE_ADD_HIGHLIGHT"; record: HighlightRecord }
-  | { type: "LIUCAI_STORAGE_PUT_HIGHLIGHT"; record: HighlightRecord }
-  | {
-    type: "LIUCAI_STORAGE_IMPORT_LEGACY";
-    pages: PageRecord[];
-    highlights: HighlightRecord[];
-  };
+  | { type: "LIUCAI_STORAGE_PUT_HIGHLIGHT"; record: HighlightRecord };
 
 export type StorageResponse<T> =
   | { ok: true; data: T }
@@ -112,7 +113,6 @@ const STORAGE_MESSAGE_TYPES = new Set<StorageRequest["type"]>([
   "LIUCAI_STORAGE_GET_HIGHLIGHT",
   "LIUCAI_STORAGE_ADD_HIGHLIGHT",
   "LIUCAI_STORAGE_PUT_HIGHLIGHT",
-  "LIUCAI_STORAGE_IMPORT_LEGACY",
 ]);
 
 export function isStorageRequest(message: unknown): message is StorageRequest {
@@ -145,6 +145,7 @@ export function isAiExplainRequest(message: unknown): message is AiExplainReques
   if (typeof message !== "object" || message === null) return false;
   const request = message as Partial<AiExplainRequest>;
   return request.type === "LIUCAI_AI_EXPLAIN"
+    && isRequestId(request.requestId)
     && typeof request.selectedText === "string"
     && request.selectedText.trim().length > 0
     && request.selectedText.length <= 1500
@@ -157,6 +158,7 @@ export function isAiExampleRequest(message: unknown): message is AiExampleReques
   if (typeof message !== "object" || message === null) return false;
   const request = message as Partial<AiExampleRequest>;
   return request.type === "LIUCAI_AI_EXAMPLE"
+    && isRequestId(request.requestId)
     && typeof request.selectedText === "string"
     && request.selectedText.trim().length > 0
     && request.selectedText.length <= 1500
@@ -166,6 +168,17 @@ export function isAiExampleRequest(message: unknown): message is AiExampleReques
     && request.concept.trim().length > 0
     && request.concept.length <= 120
     && (request.locale === "zh-CN" || request.locale === "en");
+}
+
+export function isAiCancelRequest(message: unknown): message is AiCancelRequest {
+  return typeof message === "object"
+    && message !== null
+    && (message as AiCancelRequest).type === "LIUCAI_AI_CANCEL"
+    && isRequestId((message as AiCancelRequest).requestId);
+}
+
+function isRequestId(value: unknown): value is string {
+  return typeof value === "string" && value.length > 0 && value.length <= 100;
 }
 
 export function isAiTestConnectionRequest(message: unknown): message is AiTestConnectionRequest {

@@ -2,12 +2,12 @@ import {
   addHighlight,
   getActiveHighlights,
   getHighlight,
-  importLegacyRecords,
   putHighlight,
   upsertPage,
 } from "./db";
 import {
   AI_AUTH_STATE_STORAGE_KEY,
+  isAiCancelRequest,
   isAiExampleRequest,
   isAiExplainRequest,
   isAiTestConnectionRequest,
@@ -15,6 +15,7 @@ import {
   isSyncRequest,
   type StorageRequest,
   type StorageResponse,
+  type AiCancelRequest,
   type AiExplainRequest,
   type AiExampleRequest,
   type AiTestConnectionRequest,
@@ -27,6 +28,7 @@ import {
   testAiConnection,
   type AiExplanationDependencies,
 } from "./aiExplanation";
+import { AiRequestRegistry } from "./aiRequestRegistry";
 import { getActiveLlmConnection, loadLlmSettings } from "./llmSettings";
 import { getSyncStatus, initializeSync, retrySync, signIn, signOut, signUp, triggerSync } from "./sync";
 
@@ -35,6 +37,15 @@ chrome.runtime.onInstalled.addListener(() => {
 });
 
 initializeSync();
+
+/** At most one visible model request per tab/document, without cross-tab cancellation. */
+const aiRequests = new AiRequestRegistry();
+
+// IndexedDB is best-effort: under storage pressure the browser may evict it, taking every saved
+// highlight with it. Ask for a persistent grant, backed by the `unlimitedStorage` permission.
+if (navigator.storage?.persist) {
+  void navigator.storage.persist().catch(() => undefined);
+}
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (
@@ -45,12 +56,13 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       && !isAiExplainRequest(message)
       && !isAiExampleRequest(message)
       && !isAiTestConnectionRequest(message)
+      && !isAiCancelRequest(message)
     )
   ) {
     return undefined;
   }
 
-  void handleRequest(message)
+  void handleRequest(message, sender)
     .then((data) => sendResponse({ ok: true, data } satisfies StorageResponse<unknown>))
     .catch((error) => sendResponse({
       ok: false,
@@ -60,17 +72,28 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 });
 
 async function handleRequest(
-  request: StorageRequest | SyncRequest | AiExplainRequest | AiExampleRequest | AiTestConnectionRequest,
+  request: StorageRequest | SyncRequest | AiExplainRequest | AiExampleRequest | AiTestConnectionRequest | AiCancelRequest,
+  sender: chrome.runtime.MessageSender,
 ): Promise<unknown> {
+  if (isAiCancelRequest(request)) {
+    const contextKey = aiContextKey(sender);
+    aiRequests.cancel(contextKey, request.requestId);
+    return { cancelled: true };
+  }
   if (isAiTestConnectionRequest(request)) {
     await testAiConnection(request.connection);
     return { connected: true };
   }
-  if (isAiExampleRequest(request)) {
-    return generateExample(request, getAiDependencies());
-  }
-  if (isAiExplainRequest(request)) {
-    return explainSelection(request, getAiDependencies());
+  if (isAiExampleRequest(request) || isAiExplainRequest(request)) {
+    const contextKey = aiContextKey(sender);
+    const abort = aiRequests.begin(contextKey, request.requestId);
+    try {
+      return isAiExampleRequest(request)
+        ? await generateExample(request, getAiDependencies(), abort.signal)
+        : await explainSelection(request, getAiDependencies(), abort.signal);
+    } finally {
+      aiRequests.finish(contextKey, request.requestId, abort);
+    }
   }
   if (isSyncRequest(request)) {
     const status = await handleSyncRequest(request);
@@ -88,6 +111,11 @@ async function handleRequest(
   const result = await handleStorageRequest(request);
   if (isMutationRequest(request)) void triggerSync().catch(() => undefined);
   return result;
+}
+
+function aiContextKey(sender: chrome.runtime.MessageSender): string {
+  if (typeof sender.tab?.id === "number") return `tab:${sender.tab.id}`;
+  return `document:${sender.documentId ?? sender.url ?? "extension"}`;
 }
 
 function getAiDependencies(): AiExplanationDependencies {
@@ -110,8 +138,6 @@ async function handleStorageRequest(request: StorageRequest): Promise<unknown> {
       return addHighlight(request.record);
     case "LIUCAI_STORAGE_PUT_HIGHLIGHT":
       return putHighlight(request.record);
-    case "LIUCAI_STORAGE_IMPORT_LEGACY":
-      return importLegacyRecords(request.pages, request.highlights);
   }
 }
 

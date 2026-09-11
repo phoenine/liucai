@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { placeTooltip, TOOLTIP_COLORS } from "../src/highlightTooltip.ts";
+import { clientRectNearPoint, placeTooltip, TOOLTIP_COLORS, HIGHLIGHT_SOFT } from "../src/highlightTooltip.ts";
 
 test("places a tooltip above the highlight when space is available", () => {
   assert.deepEqual(
@@ -35,10 +35,32 @@ test("keeps a tooltip inside the horizontal viewport margin", () => {
   );
 });
 
+test("anchors a tooltip to the line box nearest the pointer", () => {
+  const nearest = clientRectNearPoint(
+    [
+      { left: 10, right: 100, top: 10, bottom: 24, width: 90, height: 14 },
+      { left: 10, right: 220, top: 28, bottom: 42, width: 210, height: 14 },
+      { left: 10, right: 180, top: 46, bottom: 60, width: 170, height: 14 },
+    ],
+    40,
+    50,
+  );
+
+  assert.deepEqual(nearest, { left: 10, right: 180, top: 46, bottom: 60, width: 170, height: 14 });
+});
+
 test("provides a light background for every highlight color", () => {
-  assert.deepEqual(TOOLTIP_COLORS, {
-    gold: "#fffbe6",
-    mint: "#ecfff9",
-    coral: "#fff1ee",
-  });
+  assert.deepEqual(TOOLTIP_COLORS, HIGHLIGHT_SOFT);
+});
+
+test("keeps the below-anchor fallback in the viewport when the anchor sits above it", () => {
+  // A line box under a cursor at the very top edge can have a negative bottom.
+  const placement = placeTooltip(
+    { left: 0, right: 100, top: -80, bottom: -60 },
+    { width: 160, height: 60 },
+    { width: 400, height: 300 },
+  );
+
+  assert.equal(placement.placement, "bottom");
+  assert.equal(placement.top, 8);
 });

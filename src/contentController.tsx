@@ -13,11 +13,10 @@ import {
   type EditorFocus,
 } from "./contentUi";
 import { appendNote, formatAiExplanationNote } from "./aiNote";
-import { createSelectorFromRange, rangesFromSelectors } from "./domText";
+import { createSelectorFromRange, LIUCAI_UI_SELECTOR, rangesFromSelectors } from "./domText";
 import { applyHighlight, removeHighlightFromDom, updateHighlightAttributes } from "./highlightDom";
 import { HoverRequestTracker } from "./hoverRequest";
 import { generateUuid } from "./id";
-import { migrateLegacySiteData } from "./legacyMigration";
 import {
   AI_AUTH_STATE_STORAGE_KEY,
   isPageStatusRequest,
@@ -77,6 +76,8 @@ const INTERACTIVE_CONTENT_SELECTOR = [
   "[contenteditable='true']",
 ].join(",");
 
+const LIUCAI_POINTER_UI_SELECTOR = `${LIUCAI_UI_SELECTOR},.liucai-highlight-tooltip`;
+
 const LOCATION_CHECK_INTERVAL_MS = 750;
 const PAGE_SETTLE_DELAY_MS = 50;
 
@@ -97,6 +98,10 @@ export class ContentController {
   private locationTimer: number | null = null;
   private selectionRequestId = 0;
   private aiRequestId = 0;
+  private activeAiModelRequestId: string | null = null;
+  private mouseDownStartedInUi = false;
+  private ignorePageClickUntilMouseDown = false;
+  private editorDirty = false;
   private disposed = false;
 
   async initialize(): Promise<void> {
@@ -106,9 +111,6 @@ export class ContentController {
     window.addEventListener("hashchange", this.checkLocation);
     window.addEventListener("popstate", this.checkLocation);
     this.locationTimer = window.setInterval(this.checkLocation, LOCATION_CHECK_INTERVAL_MS);
-    await migrateLegacySiteData().catch((error) => {
-      this.reportError("legacy data migration", error);
-    });
     await this.transitions.run(() => this.syncActivation());
   }
 
@@ -141,32 +143,55 @@ export class ContentController {
     }
 
     await this.refreshPreferences();
-    await this.restoreHighlights();
-    await this.refreshSidebarData();
-
     if (this.disposed || await isHostnameDisabled(this.hostname)) {
       this.deactivate();
       return;
     }
 
+    // Register the listeners and mark the page active *before* the restore calls. Those calls go
+    // through the background service worker, and one failed round trip (a cold start, or a
+    // just-updated extension) used to leave the tab with no listeners at all — highlighting, the
+    // sidebar and the popup's "enabled" badge all lied, with no way to recover short of navigating.
+    document.addEventListener("mousedown", this.handleMouseDown, true);
     document.addEventListener("mouseup", this.handleMouseUp, true);
+    document.addEventListener("pointercancel", this.clearUiMouseDown, true);
     document.addEventListener("keydown", this.handleKeyDown, true);
     document.addEventListener("click", this.handleDocumentClickEvent, true);
     document.addEventListener("pointerover", this.handleHighlightPointerOver, true);
     document.addEventListener("pointerout", this.handleHighlightPointerOut, true);
+    // Capture phase, so scrolling inside a nested container counts too.
+    document.addEventListener("scroll", this.handleViewportChange, true);
+    window.addEventListener("resize", this.handleViewportChange);
+    window.addEventListener("blur", this.clearUiMouseDown);
     this.pageActive = true;
+
+    try {
+      await this.restoreHighlights();
+      await this.refreshSidebarData(true);
+    } catch (error) {
+      // Rendering can be retried by the next storage change or navigation; the page stays usable.
+      this.reportError("initial highlight restore", error);
+    }
   }
 
   private deactivate(): void {
+    document.removeEventListener("mousedown", this.handleMouseDown, true);
     document.removeEventListener("mouseup", this.handleMouseUp, true);
+    document.removeEventListener("pointercancel", this.clearUiMouseDown, true);
     document.removeEventListener("keydown", this.handleKeyDown, true);
     document.removeEventListener("click", this.handleDocumentClickEvent, true);
     document.removeEventListener("pointerover", this.handleHighlightPointerOver, true);
     document.removeEventListener("pointerout", this.handleHighlightPointerOut, true);
+    document.removeEventListener("scroll", this.handleViewportChange, true);
+    window.removeEventListener("resize", this.handleViewportChange);
+    window.removeEventListener("blur", this.clearUiMouseDown);
     this.pageActive = false;
     this.sidebarOpen = false;
     this.currentSelectionRange = null;
+    this.mouseDownStartedInUi = false;
+    this.ignorePageClickUntilMouseDown = false;
     this.aiRequestId += 1;
+    this.cancelAiRequest();
     this.hoverRequests.clear();
     this.mounts.hideAll();
     for (const span of Array.from(document.querySelectorAll<HTMLElement>(".liucai-highlight"))) {
@@ -183,6 +208,14 @@ export class ContentController {
     this.observedHref = nextHref;
     if (!hasPageIdentityChanged(this.identity, nextHref)) {
       this.identity = createPageIdentity(nextHref);
+      // switchPage() deactivates before it settles, so a URL that changes to a same-canonical
+      // variant inside that window lands here with the page already torn down. Nothing else would
+      // bring it back: the next checkLocation() sees href === observedHref and returns at once.
+      if (!this.pageActive) {
+        void this.transitions
+          .run(() => this.syncActivation())
+          .catch((error) => this.reportError("page activation", error));
+      }
       return;
     }
 
@@ -227,7 +260,7 @@ export class ContentController {
       if (languageChanged && this.pageActive) {
         this.aiRequestId += 1;
         this.mounts.hideToolbar();
-        this.mounts.hidePopover();
+        if (!this.editorDirty) this.mounts.hidePopover();
         void this.transitions
           .run(() => this.refreshSidebarData())
           .catch((error) => this.reportError("language preference sync", error));
@@ -240,7 +273,7 @@ export class ContentController {
       this.aiRequestId += 1;
       this.currentSelectionRange = null;
       this.mounts.hideToolbar();
-      this.mounts.hidePopover();
+      if (!this.editorDirty) this.mounts.hidePopover();
       if (Object.keys(changes).length === 1) return;
     }
 
@@ -254,9 +287,15 @@ export class ContentController {
 
   private async refreshSyncedPage(): Promise<void> {
     if (!this.pageActive || this.disposed) return;
+    // The spans are rebuilt below, which would leave a visible tooltip anchored to a removed node.
+    this.mounts.hideHighlightTooltip();
+    if (this.mounts.hasPopover()) {
+      await this.restoreHighlights();
+      await this.refreshSidebarData();
+      return;
+    }
     this.aiRequestId += 1;
     this.mounts.hideToolbar();
-    this.mounts.hidePopover();
     for (const span of Array.from(document.querySelectorAll<HTMLElement>(".liucai-highlight"))) {
       span.replaceWith(...Array.from(span.childNodes));
     }
@@ -266,7 +305,9 @@ export class ContentController {
 
   private handleKeyDown = (event: KeyboardEvent): void => {
     if (event.key === "Escape") {
+      if (this.editorDirty) return;
       this.aiRequestId += 1;
+      this.cancelAiRequest();
       this.mounts.hideToolbar();
       this.mounts.hidePopover();
     }
@@ -300,13 +341,15 @@ export class ContentController {
   }
 
   private handleMouseUp = (event: MouseEvent): void => {
-    if (
-      (event.target as Element | null)?.closest?.(
-        ".liucai-toolbar,.liucai-popover,.liucai-sidebar,.liucai-mini-sidebar",
-      )
-    ) {
+    const startedInUi = this.mouseDownStartedInUi;
+    if (startedInUi || this.isLiucaiUiTarget(event.target)) {
+      window.setTimeout(this.clearUiMouseDown, 0);
       return;
     }
+    this.mouseDownStartedInUi = false;
+
+    // Unsaved editor content must only be discarded by its explicit Cancel action.
+    if (this.editorDirty) return;
 
     const requestId = ++this.selectionRequestId;
     const selection = window.getSelection();
@@ -339,8 +382,24 @@ export class ContentController {
   };
 
   private handleDocumentClickEvent = (event: MouseEvent): void => {
+    const startedInUi = this.mouseDownStartedInUi;
+    this.mouseDownStartedInUi = false;
+    if (startedInUi || this.ignorePageClickUntilMouseDown) return;
     this.runAsync("handle highlight click", () => this.handleDocumentClick(event));
   };
+
+  private handleMouseDown = (event: MouseEvent): void => {
+    this.ignorePageClickUntilMouseDown = false;
+    this.mouseDownStartedInUi = this.isLiucaiUiTarget(event.target);
+  };
+
+  private clearUiMouseDown = (): void => {
+    this.mouseDownStartedInUi = false;
+  };
+
+  private isLiucaiUiTarget(target: EventTarget | null): boolean {
+    return target instanceof Element && Boolean(target.closest(LIUCAI_POINTER_UI_SELECTOR));
+  }
 
   private handleHighlightPointerOver = (event: PointerEvent): void => {
     const highlight = this.getTooltipHighlight(event.target);
@@ -368,11 +427,21 @@ export class ContentController {
         highlight,
         normalized.color,
         <HighlightTooltip note={normalized.note} tags={normalized.tags} />,
+        { x: event.clientX, y: event.clientY },
       );
     });
   };
 
   private handleHighlightPointerOut = (event: PointerEvent): void => {
+    const related = event.relatedTarget instanceof Element ? event.relatedTarget : null;
+    if (related?.closest(".liucai-highlight-tooltip")) return;
+
+    const tooltip = (event.target as Element | null)?.closest?.(".liucai-highlight-tooltip");
+    if (tooltip) {
+      if (!related?.closest(".liucai-highlight-tooltip")) this.mounts.hideHighlightTooltip();
+      return;
+    }
+
     const highlight = this.getTooltipHighlight(event.target);
     if (!highlight || this.isInsideHighlight(highlight, event.relatedTarget)) {
       return;
@@ -384,15 +453,35 @@ export class ContentController {
     this.mounts.hideHighlightTooltip();
   };
 
-  private async handleDocumentClick(event: MouseEvent): Promise<void> {
-    const target = event.target as Element | null;
-    if (
-      target?.closest?.(
-        ".liucai-toolbar,.liucai-popover,.liucai-sidebar,.liucai-mini-sidebar",
-      )
-    ) {
+  /**
+   * A fixed-position tooltip does not follow its anchor when the page scrolls or the window resizes,
+   * and the browser delivers no pointerout for either. Hide it rather than leave it floating over
+   * unrelated content until the pointer happens to move.
+   */
+  private handleViewportChange = (event: Event): void => {
+    if (event.target instanceof Element && event.target.closest(".liucai-highlight-tooltip")) {
       return;
     }
+    this.mounts.hideHighlightTooltip();
+  };
+
+  /**
+   * Closing the AI card only made the content script ignore the answer; the model kept generating
+   * until it finished or the timeout fired.
+   */
+  private cancelAiRequest(): void {
+    const requestId = this.activeAiModelRequestId;
+    if (!requestId) return;
+    this.activeAiModelRequestId = null;
+    void chrome.runtime.sendMessage({ type: "LIUCAI_AI_CANCEL", requestId }).catch(() => undefined);
+  }
+
+  private async handleDocumentClick(event: MouseEvent): Promise<void> {
+    const target = event.target as Element | null;
+    if (this.isLiucaiUiTarget(target)) {
+      return;
+    }
+    if (this.editorDirty) return;
 
     const selection = window.getSelection();
     if (selection && !selection.isCollapsed && selection.toString().trim()) {
@@ -400,6 +489,8 @@ export class ContentController {
     }
 
     this.aiRequestId += 1;
+    this.cancelAiRequest();
+    // The dirty-editor guard above makes Cancel and Save the only ways to discard pending edits.
     this.mounts.hidePopover();
 
     const highlightEl = target?.closest?.(".liucai-highlight") as HTMLElement | null;
@@ -495,6 +586,7 @@ export class ContentController {
   }
 
   private handleAiSelection = (): void => {
+    if (this.editorDirty) return;
     const range = this.currentSelectionRange?.cloneRange();
     if (!range) return;
 
@@ -520,12 +612,17 @@ export class ContentController {
           createsHighlight={highlightIds.length === 0}
           onLoadExample={async () => {
             if (!explanation) throw new Error("AI_EXPLANATION_MISSING");
+            const modelRequestId = generateUuid();
+            this.activeAiModelRequestId = modelRequestId;
             const response = await chrome.runtime.sendMessage({
               type: "LIUCAI_AI_EXAMPLE",
+              requestId: modelRequestId,
               selectedText: selectedText.slice(0, 1500),
               contextText: contextText.slice(0, 2500),
               concept: explanation.concept,
               locale: this.interfaceLocale,
+            }).finally(() => {
+              if (this.activeAiModelRequestId === modelRequestId) this.activeAiModelRequestId = null;
             }) as StorageResponse<AiExample> | undefined;
             if (!response?.ok) throw new Error(response?.error ?? "AI_REQUEST_FAILED");
             return response.data.example;
@@ -537,6 +634,7 @@ export class ContentController {
           onRetry={() => request()}
           onClose={() => {
             this.aiRequestId += 1;
+            this.cancelAiRequest();
             this.mounts.hidePopover();
           }}
         />,
@@ -547,8 +645,11 @@ export class ContentController {
 
     const request = (): void => {
       render({ status: "loading" });
+      const modelRequestId = generateUuid();
+      this.activeAiModelRequestId = modelRequestId;
       void chrome.runtime.sendMessage({
         type: "LIUCAI_AI_EXPLAIN",
+        requestId: modelRequestId,
         selectedText: selectedText.slice(0, 1500),
         contextText: contextText.slice(0, 2500),
         locale: this.interfaceLocale,
@@ -561,6 +662,8 @@ export class ContentController {
         render({ status: "success", explanation: response.data });
       }).catch((error) => {
         render({ status: "error", error: this.stringifyError(error) });
+      }).finally(() => {
+        if (this.activeAiModelRequestId === modelRequestId) this.activeAiModelRequestId = null;
       });
     };
 
@@ -690,6 +793,8 @@ export class ContentController {
     top: number,
     focus: EditorFocus = "note",
   ): void {
+    this.ignorePageClickUntilMouseDown = true;
+    this.editorDirty = false;
     const safeRecord = normalizeHighlightRecord(record);
     const node = this.mounts.showPopover(
       left,
@@ -698,18 +803,30 @@ export class ContentController {
         copy={this.contentCopy}
         record={safeRecord}
         focus={focus}
-        onCancel={() => this.mounts.hidePopover()}
-        onSave={(id, note, tags) => this.runAsync(
-          "save highlight meta",
-          () => this.saveHighlightMeta(id, note, tags),
-        )}
+        onDirtyChange={(dirty) => {
+          this.editorDirty = dirty;
+        }}
+        onCancel={() => {
+          this.editorDirty = false;
+          this.mounts.hidePopover();
+        }}
+        onSave={(id, note, tags) => this.saveHighlightMeta(id, note, tags)}
       />,
     );
     this.mounts.fitPopoverInViewport(node);
   }
 
-  private async refreshSidebarData(): Promise<void> {
+  /**
+   * `force` belongs to the activation path, which renders before it flips `pageActive`. Every
+   * other caller arrives after an `await`, so it must confirm the page is still live: a late IPC
+   * reply used to remount the mini sidebar on a page that had already been deactivated, including
+   * on a site the user had just disabled from the popup.
+   */
+  private async refreshSidebarData(force = false): Promise<void> {
     const records = await getActiveHighlights(this.identity.canonicalUrl);
+    if (this.disposed || (!force && !this.pageActive)) {
+      return;
+    }
     this.renderMiniSidebar(records.length);
     if (this.sidebarOpen) {
       this.renderSidebar(records);
@@ -728,6 +845,9 @@ export class ContentController {
   }
 
   private async toggleSidebar(): Promise<void> {
+    if (this.disposed || !this.pageActive) {
+      return;
+    }
     if (this.sidebarOpen) {
       this.mounts.hideSidebar();
       this.sidebarOpen = false;
@@ -782,6 +902,9 @@ export class ContentController {
     color: HighlightColor,
     options: { openEditor: boolean; focus?: EditorFocus; initialNote?: string },
   ): Promise<void> {
+    if (options.openEditor) {
+      this.ignorePageClickUntilMouseDown = true;
+    }
     const range = this.currentSelectionRange;
     this.mounts.hideToolbar();
     window.getSelection()?.removeAllRanges();
@@ -791,12 +914,21 @@ export class ContentController {
     if (!selector) return;
     const displayText = getRangeDisplayText(range);
 
+    // Freeze the page identity before awaiting. Otherwise a navigation landing during the round trip
+    // pairs the old page id with the new canonical url, and the span gets wrapped into a range that
+    // is no longer in the document — an invisible highlight plus a record that points at two pages.
+    const canonicalUrl = this.identity.canonicalUrl;
     const page = await this.getCurrentPage();
+    if (this.disposed || !this.pageActive || this.identity.canonicalUrl !== canonicalUrl) {
+      this.currentSelectionRange = null;
+      return;
+    }
+
     const now = new Date().toISOString();
     const highlight: HighlightRecord = {
       id: generateUuid(),
       pageId: page.id,
-      canonicalUrl: this.identity.canonicalUrl,
+      canonicalUrl,
       text: displayText || selector.exact,
       color,
       note: options.initialNote ?? "",
@@ -840,7 +972,8 @@ export class ContentController {
     tags: string[],
   ): Promise<void> {
     const record = await getHighlight(id);
-    if (!record) return;
+    // Throw rather than returning quietly: the popover shows a failure state from this rejection.
+    if (!record) throw new Error(`HIGHLIGHT_NOT_FOUND:${id}`);
 
     const updated: HighlightRecord = {
       ...normalizeHighlightRecord(record),
@@ -850,6 +983,7 @@ export class ContentController {
     };
     await putHighlight(updated);
     updateHighlightAttributes(updated);
+    this.editorDirty = false;
     this.mounts.hidePopover();
     await this.refreshSidebarData();
   }
@@ -859,7 +993,7 @@ export class ContentController {
     color: HighlightColor,
   ): Promise<void> {
     const record = await getHighlight(id);
-    if (!record) return;
+    if (!record) throw new Error(`HIGHLIGHT_NOT_FOUND:${id}`);
 
     const updated: HighlightRecord = {
       ...normalizeHighlightRecord(record),
@@ -938,7 +1072,9 @@ export class ContentController {
 
   private async deleteHighlight(id: string): Promise<void> {
     const record = await getHighlight(id);
-    if (!record) return;
+    // Throw rather than returning quietly: the sidebar waits on this promise, and a silent
+    // "success" left its delete button stuck on "deleting" with both buttons disabled.
+    if (!record) throw new Error(`HIGHLIGHT_NOT_FOUND:${id}`);
 
     const now = new Date().toISOString();
     await putHighlight({
@@ -1011,16 +1147,32 @@ export class ContentController {
   }
 
   private getTooltipHighlight(target: EventTarget | null): HTMLElement | null {
-    return (target as Element | null)?.closest?.(
-      '.liucai-highlight--last:is([data-has-note="true"],[data-has-tags="true"])',
-    ) as HTMLElement | null;
+    const highlight = (target as Element | null)?.closest?.(".liucai-highlight") as HTMLElement | null;
+    if (!highlight) {
+      return null;
+    }
+    if (highlight.dataset.hasNote === "true" || highlight.dataset.hasTags === "true") {
+      return highlight;
+    }
+    return null;
   }
 
   private isInsideHighlight(
     highlight: HTMLElement,
     target: EventTarget | null,
   ): boolean {
-    return target instanceof Node && highlight.contains(target);
+    if (!(target instanceof Node)) {
+      return false;
+    }
+    if (highlight.contains(target)) {
+      return true;
+    }
+    const id = highlight.dataset.id;
+    if (!id || !(target instanceof Element)) {
+      return false;
+    }
+    const other = target.closest(".liucai-highlight");
+    return other instanceof HTMLElement && other.dataset.id === id;
   }
 
   private runAsync(label: string, task: () => Promise<void>): void {
@@ -1049,5 +1201,11 @@ export class ContentController {
 }
 
 function normalizeHighlightRecord(record: HighlightRecord): HighlightRecord {
-  return { ...record, tags: Array.isArray(record.tags) ? record.tags : [] };
+  // Every consumer trims `note` directly (the note editor, the Obsidian export, the sidebar), so a
+  // record stored before that field existed must not reach them as undefined.
+  return {
+    ...record,
+    note: typeof record.note === "string" ? record.note : "",
+    tags: Array.isArray(record.tags) ? record.tags : [],
+  };
 }

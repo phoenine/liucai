@@ -14,10 +14,19 @@ import { getSupabaseClient } from "./supabaseClient";
 import { parseSyncBatchResult, toRemoteMutations } from "./syncProtocol";
 
 const ALARM_NAME = "liucai-sync";
+/** Passed to `getOutboxBatch` as `now` to make it disregard every recorded backoff. */
+const IGNORE_BACKOFF = new Date(8640000000000000);
 let activeSync: Promise<void> | null = null;
+/** Set when a forced sync is asked for while one is already running. */
+let forceRequested = false;
 
 export function initializeSync(): void {
-  chrome.alarms.create(ALARM_NAME, { periodInMinutes: 5 });
+  // `chrome.alarms.create` replaces an alarm of the same name and restarts its countdown, and this
+  // runs on every service-worker wake-up — including the ones each content-script message causes.
+  // Creating unconditionally meant an active browsing session kept pushing the periodic sync away.
+  void chrome.alarms.get(ALARM_NAME).then((existing) => {
+    if (!existing) chrome.alarms.create(ALARM_NAME, { periodInMinutes: 5 });
+  });
   chrome.alarms.onAlarm.addListener((alarm) => {
     if (alarm.name === ALARM_NAME) void triggerSync().catch(() => undefined);
   });
@@ -78,10 +87,24 @@ export async function retrySync(): Promise<SyncStatus> {
 }
 
 export function triggerSync(force = false): Promise<void> {
-  if (activeSync) return activeSync;
-  activeSync = runSync(force).finally(() => {
-    activeSync = null;
-  });
+  if (activeSync) {
+    // The in-flight run has already taken its batch, so a forced request arriving now would do
+    // nothing at all — remember it and serve it with one more run when this one finishes.
+    if (force) forceRequested = true;
+    return activeSync;
+  }
+  activeSync = (async () => {
+    try {
+      await runSync(force);
+      while (forceRequested) {
+        forceRequested = false;
+        await runSync(true);
+      }
+    } finally {
+      activeSync = null;
+      forceRequested = false;
+    }
+  })();
   return activeSync;
 }
 
@@ -96,7 +119,7 @@ async function runSync(force: boolean): Promise<void> {
   let lastBatchIds: string[] = [];
   try {
     for (let round = 0; round < 20; round += 1) {
-      const batch = await getOutboxBatch(100, force ? new Date(8640000000000000) : new Date());
+      const batch = await getOutboxBatch(100, force ? IGNORE_BACKOFF : new Date());
       lastBatchIds = batch.map((mutation) => mutation.mutationId);
       const cursor = await getSyncCursor(user.id);
       const { data: response, error } = await client.rpc("apply_sync_batch", {
@@ -113,6 +136,9 @@ async function runSync(force: boolean): Promise<void> {
       }
       if (!result.hasMore && batch.length === 0) return;
     }
+    // The round cap bounds a single wake-up. Work is still pending, so schedule a prompt follow-up
+    // rather than stalling quietly until the next regular interval.
+    chrome.alarms.create(ALARM_NAME, { when: Date.now() + 1_000, periodInMinutes: 5 });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     if (lastBatchIds.length > 0) await recordSyncFailure(lastBatchIds, message);

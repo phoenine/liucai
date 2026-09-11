@@ -81,36 +81,6 @@ test("writes highlight snapshots and tombstones to the outbox", async () => {
   assert.equal((await storage.getHighlight(highlight.id))?.deletedAt, "2026-09-09T00:01:00.000Z");
 });
 
-test("merges legacy pages by canonical URL and remaps highlight page IDs", async () => {
-  const current = await storage.upsertPage(
-    "https://example.com/article",
-    "https://example.com/article",
-    "Current",
-  );
-  await storage.db.outbox.clear();
-
-  const legacyPage: PageRecord = {
-    id: "legacy-page",
-    canonicalUrl: "https://example.com/article",
-    originalUrl: "https://example.com/article?from=legacy",
-    title: "Legacy title",
-    createdAt: "2026-01-01T00:00:00.000Z",
-    updatedAt: "2099-01-01T00:00:00.000Z",
-    lastOpenedAt: "2099-01-01T00:00:00.000Z",
-  };
-  const legacyHighlight = createHighlight(legacyPage.id);
-
-  await storage.importLegacyRecords([legacyPage], [legacyHighlight]);
-  await storage.importLegacyRecords([legacyPage], [legacyHighlight]);
-
-  const mergedPage = await storage.db.pages.where("canonicalUrl").equals(legacyPage.canonicalUrl).first();
-  assert.equal(await storage.db.pages.count(), 1);
-  assert.equal(mergedPage?.id, current.id);
-  assert.equal(mergedPage?.title, "Legacy title");
-  assert.equal((await storage.getHighlight(legacyHighlight.id))?.pageId, current.id);
-  assert.equal(await storage.db.outbox.count(), 2);
-});
-
 test("applies acknowledged remote changes and advances the account cursor atomically", async () => {
   const localPage = await storage.upsertPage(
     "https://example.com/article",
@@ -273,6 +243,126 @@ test("first account binding queues a complete page-first bootstrap exactly once"
 
   await storage.bindLocalDatabaseToUser("user-a");
   assert.equal(await storage.db.outbox.count(), 2);
+});
+
+test("ignores the recorded backoff when handed a far-future now", async () => {
+  await storage.upsertPage(
+    "https://example.com/backoff",
+    "https://example.com/backoff",
+    "Backoff",
+  );
+  const [pending] = await storage.getOutboxBatch();
+  await storage.recordSyncFailure([pending.mutationId], "server rejected the batch");
+
+  // While the backoff runs, an ordinary read must hold the record back...
+  assert.equal((await storage.getOutboxBatch(100, new Date())).length, 0);
+  // ...but a far-future "now" is how the sync loop asks for "ignore the backoff". Comparing that
+  // date as text used to sort it before every real date and hide the record instead of unearthing it.
+  assert.equal((await storage.getOutboxBatch(100, new Date(8640000000000000))).length, 1);
+});
+
+test("keeps queued payloads byte-for-byte aligned with local records", async () => {
+  const longUrl = `https://example.com/${"a".repeat(9000)}`;
+  const page = await storage.upsertPage(longUrl, longUrl, "t".repeat(5000));
+  const [mutation] = await storage.getOutboxBatch();
+  const payload = mutation.payload as PageRecord;
+
+  assert.equal(payload.canonicalUrl, page.canonicalUrl);
+  assert.equal(payload.originalUrl, page.originalUrl);
+  assert.equal(payload.title, page.title);
+});
+
+test("rejects an oversized note instead of silently truncating it", async () => {
+  const page = await storage.upsertPage(
+    "https://example.com/article",
+    "https://example.com/article",
+    "Example",
+  );
+  await assert.rejects(
+    storage.addHighlight({ ...createHighlight(page.id), note: "字".repeat(1_048_577) }),
+    /NOTE_TOO_LONG/,
+  );
+  assert.equal(await storage.db.highlights.count(), 0);
+  assert.equal((await storage.db.outbox.toArray()).filter((item) => item.entityType === "highlight").length, 0);
+});
+
+test("stops retrying a mutation that keeps failing so it cannot freeze the queue", async () => {
+  await storage.upsertPage("https://example.com/stuck", "https://example.com/stuck", "Stuck");
+  const [pending] = await storage.getOutboxBatch();
+
+  for (let attempt = 0; attempt < 8; attempt += 1) {
+    await storage.recordSyncFailure([pending.mutationId], "server said no");
+  }
+
+  // Still queued locally, but no longer dragging everything behind it down.
+  assert.equal(await storage.db.outbox.count(), 1);
+  assert.equal((await storage.getOutboxBatch(100, new Date(8640000000000000))).length, 0);
+
+  // "Sync now" puts it back in.
+  await storage.resetOutboxRetries();
+  assert.equal((await storage.getOutboxBatch(100, new Date(8640000000000000))).length, 1);
+});
+
+test("fills in a missing note so consumers can trim it", async () => {
+  // A record stored before `note` existed; every consumer calls note.trim() on it.
+  await storage.db.highlights.add({
+    id: "legacy-record",
+    pageId: "page-1",
+    canonicalUrl: "https://example.com/article",
+    text: "Selected text",
+    color: "gold",
+    note: undefined as unknown as string,
+    tags: undefined as unknown as string[],
+    selector: { exact: "Selected text", prefix: "", suffix: "", start: 0, end: 13 },
+    createdAt: "2026-09-09T00:00:00.000Z",
+    updatedAt: "2026-09-09T00:00:00.000Z",
+  });
+
+  const loaded = await storage.getHighlight("legacy-record");
+
+  assert.equal(loaded?.note, "");
+  assert.deepEqual(loaded?.tags, []);
+});
+
+test("keeps local page timestamps when applying a remote change", async () => {
+  const page = await storage.upsertPage(
+    "https://example.com/keep",
+    "https://example.com/keep",
+    "Keep",
+  );
+  const local = await storage.db.pages.get(page.id);
+  // Clear the outbox so the incoming change is not skipped as a pending local edit.
+  await storage.db.outbox.clear();
+  const remote = "2026-09-11T00:00:00+00:00";
+
+  await storage.applySyncBatch("user-a", {
+    acknowledgedMutationIds: [],
+    changes: [{
+      sequence: 1,
+      entityType: "page",
+      entityId: page.id,
+      operation: "upsert",
+      revision: 1,
+      payload: {
+        ...page,
+        title: "Renamed",
+        createdAt: remote,
+        updatedAt: remote,
+        lastOpenedAt: remote,
+      },
+    }],
+    nextCursor: 1,
+    hasMore: false,
+  });
+
+  const after = await storage.db.pages.get(page.id);
+
+  assert.equal(after?.title, "Renamed");
+  // The server has no column for these two, so its echoes of updatedAt must not overwrite them.
+  assert.equal(after?.lastOpenedAt, local?.lastOpenedAt);
+  assert.equal(after?.createdAt, local?.createdAt);
+  // And timestamps are normalised, so ordering by string keeps working.
+  assert.match(String(after?.updatedAt), /^\d{4}-\d{2}-\d{2}T[\d:.]+Z$/);
 });
 
 function createHighlight(pageId: string): HighlightRecord {

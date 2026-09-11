@@ -9,20 +9,23 @@ export function formatAiExplanationNote(
   if (locale === "zh-CN") {
     return [
       `AI 解释｜${explanation.concept}`,
-      explanation.summary,
-      `当前语境：${explanation.contextualMeaning}`,
+      explanation.explanation,
       ...(example ? [`例子：${example}`] : []),
     ].join("\n");
   }
   return [
     `AI explanation | ${explanation.concept}`,
-    explanation.summary,
-    `In context: ${explanation.contextualMeaning}`,
+    explanation.explanation,
     ...(example ? [`Example: ${example}`] : []),
   ].join("\n");
 }
 
+/** Keep this aligned with the server-side note limit; JavaScript length is conservatively UTF-16. */
+export const MAX_NOTE_LENGTH = 1_048_576;
+
 export function appendNote(existing: string, addition: string): string {
   const current = existing.trim();
-  return current ? `${current}\n\n${addition.trim()}` : addition.trim();
+  const next = current ? `${current}\n\n${addition.trim()}` : addition.trim();
+  if (next.length > MAX_NOTE_LENGTH) throw new Error("NOTE_TOO_LONG");
+  return next;
 }
