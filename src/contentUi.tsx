@@ -417,7 +417,13 @@ function HighlightSidebarItem(props: {
         </button>
         {props.record.note.trim() ? (
           <div className="liucai-sidebar-item__note">
-            <SafeMarkdown>{props.record.note.trim()}</SafeMarkdown>
+            <div className="liucai-sidebar-item__note-label">
+              <NotePencilIcon aria-hidden weight="regular" />
+              <span>{props.copy.note}</span>
+            </div>
+            <div className="liucai-sidebar-item__note-body">
+              <SafeMarkdown>{props.record.note.trim()}</SafeMarkdown>
+            </div>
           </div>
         ) : null}
         {tags.length > 0 ? (

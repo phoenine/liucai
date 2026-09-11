@@ -48,6 +48,24 @@ test("shows complete highlight text and notes in sidebar cards", async () => {
   assert.doesNotMatch(noteRule, /(?:line-clamp|overflow:\s*hidden)/);
 });
 
+test("visually separates readable sidebar notes from excerpt text", async () => {
+  const css = await readFile(new URL("../public/content.css", import.meta.url), "utf8");
+  const ui = await readFile(new URL("../src/contentUi.tsx", import.meta.url), "utf8");
+  const textRule = css.match(/\.liucai-sidebar-item__text\s*\{[^}]*\}/s)?.[0];
+  const noteRule = css.match(/\.liucai-sidebar-item__note\s*\{[^}]*\}/s)?.[0];
+  const labelRule = css.match(/\.liucai-sidebar-item__note-label\s*\{[^}]*\}/s)?.[0];
+
+  assert.ok(textRule);
+  assert.ok(noteRule);
+  assert.ok(labelRule);
+  assert.match(textRule, /font:\s*13\.5px\/1\.55/);
+  assert.match(noteRule, /background:\s*rgba\(255, 255, 255, 0\.62\);/);
+  assert.match(noteRule, /color:\s*#273244;/i);
+  assert.match(noteRule, /font:\s*13px\/1\.6/);
+  assert.match(labelRule, /color:\s*var\(--liucai-marker\);/);
+  assert.match(ui, /className="liucai-sidebar-item__note-label"[\s\S]*?<NotePencilIcon[\s\S]*?props\.copy\.note/);
+});
+
 test("preserves semantic newlines in sidebar highlight text", async () => {
   const css = await readFile(new URL("../public/content.css", import.meta.url), "utf8");
   const textRule = css.match(/\.liucai-sidebar-item__text\s*\{[^}]*\}/s)?.[0];
@@ -75,8 +93,8 @@ test("keeps tooltip notes and tags consistent with sidebar cards", async () => {
   assert.match(css, /\.liucai-highlight-tooltip\s*\{[^}]*pointer-events:\s*auto;/s);
   assert.match(noteRule, /background:\s*transparent;/i);
   assert.match(noteRule, /pointer-events:\s*none;/i);
-  assert.match(noteRule, /color:\s*#3f4147;/i);
-  assert.match(noteRule, /font:\s*12px\//i);
+  assert.match(noteRule, /color:\s*#273244;/i);
+  assert.match(noteRule, /font:\s*13px\/1\.6/i);
   assert.match(tagRule, /background:\s*#edf2f7;/i);
   assert.match(tagRule, /color:\s*#4f6b8a;/i);
   assert.match(tagRule, /font:\s*700 10px\//i);
@@ -171,7 +189,7 @@ test("uses a compact page heading and divider above the highlight list", async (
   assert.match(dividerRule, /linear-gradient/);
 });
 
-test("keeps the original vertical rhythm between note, tags, and card actions", async () => {
+test("keeps compact vertical rhythm between note, tags, and card actions", async () => {
   const css = await readFile(new URL("../public/content.css", import.meta.url), "utf8");
   const noteRule = css.match(/\.liucai-sidebar-item__note\s*\{[^}]*\}/s)?.[0];
   const tagsRule = css.match(/\.liucai-sidebar-item__tags\s*\{[^}]*\}/s)?.[0];
@@ -180,7 +198,7 @@ test("keeps the original vertical rhythm between note, tags, and card actions", 
   assert.ok(noteRule);
   assert.ok(tagsRule);
   assert.ok(actionsRule);
-  assert.match(noteRule, /margin:\s*7px 0 0;/);
+  assert.match(noteRule, /margin:\s*10px 0 0;/);
   assert.match(tagsRule, /margin:\s*8px 0 0;/);
   assert.match(actionsRule, /margin-top:\s*8px;/);
   assert.doesNotMatch(css, /\.liucai-sidebar-item__footer\s*\{/);
