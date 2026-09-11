@@ -30,6 +30,21 @@ test("keeps reading the output array when output_text is an empty string", () =>
   }), explanation);
 });
 
+test("reads JSON that the model wrapped in prose", () => {
+  const body = JSON.stringify(explanation);
+
+  assert.deepEqual(parseAiExplanation({ output_text: `Here is the JSON:\n${body}` }), explanation);
+  assert.deepEqual(parseAiExplanation({ output_text: `${body}\nHope that helps!` }), explanation);
+  assert.deepEqual(parseAiExplanation({ output_text: `Sure! ${body} Done.` }), explanation);
+  // Braces inside strings must not end the object early.
+  assert.deepEqual(
+    parseAiExplanation({
+      output_text: `note: ${JSON.stringify({ ...explanation, concept: "a } b" })}`,
+    }),
+    { ...explanation, concept: "a } b" },
+  );
+});
+
 test("calls the configured LM Studio Responses endpoint without inventing an auth header", async () => {
   let capturedUrl = "";
   let capturedInit: RequestInit | undefined;

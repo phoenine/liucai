@@ -208,6 +208,12 @@
   box-shadow: 0 0 0 3px rgba(96, 165, 250, 0.18);
 }
 
+.liucai-popover-error {
+  margin: 0;
+  color: #b94a3b;
+  font-size: 12px;
+}
+
 .liucai-popover-actions {
   display: flex;
   gap: 8px;

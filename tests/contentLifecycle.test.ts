@@ -26,3 +26,44 @@ test("sidebar refresh bails out once the page is no longer live", async () => {
   assert.match(source, /refreshSidebarData\(true\)/);
   assert.match(source, /if \(this\.disposed \|\| !this\.pageActive\) \{\s*return;/s);
 });
+
+test("keeps the note editor open while it holds unsaved edits", async () => {
+  const controller = await controllerSource();
+  const ui = await readFile(new URL("../src/contentUi.tsx", import.meta.url), "utf8");
+
+  // A plain page click used to unmount the editor and discard whatever was typed.
+  assert.match(controller, /if \(!this\.editorDirty\) \{\s*this\.mounts\.hidePopover\(\);/s);
+  assert.match(controller, /onDirtyChange=\{\(dirty\) => \{\s*this\.editorDirty = dirty;/s);
+  assert.match(ui, /props\.onDirtyChange\?\.\(dirty\)/);
+});
+
+test("reports a failed note save instead of failing silently", async () => {
+  const ui = await readFile(new URL("../src/contentUi.tsx", import.meta.url), "utf8");
+  const controller = await controllerSource();
+
+  assert.match(ui, /setSaveStatus\("failed"\)/);
+  assert.match(ui, /props\.copy\.saveFailed/);
+  // A missing record has to reject, or the sidebar's delete button stays disabled on "deleting".
+  assert.match(controller, /HIGHLIGHT_NOT_FOUND/);
+});
+
+test("freezes the page identity before awaiting in createHighlight", async () => {
+  const source = await controllerSource();
+
+  assert.match(
+    source,
+    /const canonicalUrl = this\.identity\.canonicalUrl;\s*const page = await this\.getCurrentPage\(\);/s,
+  );
+  assert.match(source, /this\.identity\.canonicalUrl !== canonicalUrl/);
+});
+
+test("activates the page before the storage round trips", async () => {
+  const source = await controllerSource();
+  const listeners = source.indexOf('document.addEventListener("mousedown"');
+  const restore = source.indexOf("await this.restoreHighlights();");
+
+  // One failed IPC round trip used to leave the tab with no listeners at all and no way back.
+  assert.ok(listeners !== -1, "mousedown listener is registered");
+  assert.ok(restore !== -1, "restore call is present");
+  assert.ok(listeners < restore, "listeners register before the restore call");
+});

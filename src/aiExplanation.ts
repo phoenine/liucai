@@ -208,13 +208,55 @@ function parseJsonOutput(value: unknown): Record<string, unknown> {
   const outputText = extractOutputText(value);
   if (!outputText) throw new Error("AI_INVALID_RESPONSE");
   const unfenced = outputText.trim().replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "");
-  try {
-    const parsed: unknown = JSON.parse(unfenced);
-    if (isRecord(parsed)) return parsed;
-  } catch {
-    // Fall through to the stable public error code.
-  }
+  const parsed = parseFirstObject(unfenced) ?? parseFirstObject(outputText);
+  if (parsed) return parsed;
   throw new Error("AI_INVALID_RESPONSE");
+}
+
+/**
+ * The first balanced {...} in the text, or null.
+ *
+ * Local models routinely wrap the JSON in a sentence ("Here is the JSON: {...}") no matter how the
+ * instructions are phrased, and treating that as an invalid response made working models look
+ * broken. Braces inside strings are skipped so the object is found correctly.
+ */
+function parseFirstObject(text: string): Record<string, unknown> | null {
+  const start = text.indexOf("{");
+  if (start === -1) return null;
+
+  let depth = 0;
+  let inString = false;
+  let escaped = false;
+  for (let index = start; index < text.length; index += 1) {
+    const char = text[index];
+    if (escaped) {
+      escaped = false;
+      continue;
+    }
+    if (char === "\\" && inString) {
+      escaped = true;
+      continue;
+    }
+    if (char === '"') {
+      inString = !inString;
+      continue;
+    }
+    if (inString) continue;
+    if (char === "{") {
+      depth += 1;
+    } else if (char === "}") {
+      depth -= 1;
+      if (depth === 0) {
+        try {
+          const parsed: unknown = JSON.parse(text.slice(start, index + 1));
+          return isRecord(parsed) ? parsed : null;
+        } catch {
+          return null;
+        }
+      }
+    }
+  }
+  return null;
 }
 
 function requireLimitedText(

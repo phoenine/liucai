@@ -121,6 +121,8 @@ export interface ContentCopy {
   tagsPlaceholder: string;
   tagSeparator: string;
   save: string;
+  saving: string;
+  saveFailed: string;
   aiLoading: string;
   aiTitle: string;
   aiExample: string;
@@ -367,6 +369,8 @@ const CONTENT_COPY: Record<ResolvedLocale, ContentCopy> = {
     tagsPlaceholder: "输入标签，如 AI/Agent，测试/用例设计",
     tagSeparator: "，",
     save: "保存",
+    saving: "保存中…",
+    saveFailed: "保存失败，请重试",
     aiLoading: "正在理解这段内容…",
     aiTitle: "AI 轻解释",
     aiExample: "举个栗子🌰",
@@ -421,6 +425,8 @@ const CONTENT_COPY: Record<ResolvedLocale, ContentCopy> = {
     tagsPlaceholder: "Add tags, e.g. AI/Agent, testing/test design",
     tagSeparator: ", ",
     save: "Save",
+    saving: "Saving…",
+    saveFailed: "Could not save. Try again.",
     aiLoading: "Understanding this selection…",
     aiTitle: "Quick AI explanation",
     aiExample: "Give me an example 🌰",

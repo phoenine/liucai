@@ -107,7 +107,11 @@ export async function getActiveHighlights(canonicalUrl: string): Promise<Highlig
 }
 
 export function normalizeHighlightRecord(record: HighlightRecord): HighlightRecord {
-  return { ...record, tags: Array.isArray(record.tags) ? record.tags : [] };
+  return {
+    ...record,
+    note: typeof record.note === "string" ? record.note : "",
+    tags: Array.isArray(record.tags) ? record.tags : [],
+  };
 }
 
 export async function getHighlight(id: string): Promise<HighlightRecord | undefined> {

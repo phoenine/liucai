@@ -525,11 +525,30 @@ export function EditorPopover(props: {
   copy: ContentCopy;
   record: HighlightRecord;
   focus: EditorFocus;
+  onDirtyChange?: (dirty: boolean) => void;
   onCancel: () => void;
-  onSave: (id: string, note: string, tags: string[]) => void;
+  onSave: (id: string, note: string, tags: string[]) => void | Promise<void>;
 }) {
   const [note, setNote] = useState(props.record.note);
   const [tagText, setTagText] = useState(props.record.tags.join(props.copy.tagSeparator));
+  const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "failed">("idle");
+
+  const tags = parseTags(tagText);
+  const dirty = note !== props.record.note
+    || tags.join("\u0000") !== props.record.tags.join("\u0000");
+
+  // The controller keeps this popover mounted while there are unsaved edits, so it has to know.
+  useEffect(() => {
+    props.onDirtyChange?.(dirty);
+  }, [dirty]);
+  useEffect(() => () => props.onDirtyChange?.(false), []);
+
+  const save = (): void => {
+    setSaveStatus("saving");
+    void Promise.resolve(props.onSave(props.record.id, note, tags))
+      .then(() => setSaveStatus("idle"))
+      .catch(() => setSaveStatus("failed"));
+  };
 
   return (
     <>
@@ -565,9 +584,16 @@ export function EditorPopover(props: {
         onChange={(event) => setTagText(event.currentTarget.value)}
       />
       <div className="liucai-popover-actions">
-        <button data-action="cancel" onClick={props.onCancel}>{props.copy.cancel}</button>
-        <button data-action="save" onClick={() => props.onSave(props.record.id, note, parseTags(tagText))}>{props.copy.save}</button>
+        <button data-action="cancel" onClick={props.onCancel} disabled={saveStatus === "saving"}>
+          {props.copy.cancel}
+        </button>
+        <button data-action="save" onClick={save} disabled={saveStatus === "saving"}>
+          {saveStatus === "saving" ? props.copy.saving : props.copy.save}
+        </button>
       </div>
+      {saveStatus === "failed" ? (
+        <p className="liucai-popover-error" role="alert">{props.copy.saveFailed}</p>
+      ) : null}
     </>
   );
 }

@@ -100,6 +100,7 @@ export class ContentController {
   private aiRequestId = 0;
   private mouseDownStartedInUi = false;
   private ignorePageClickUntilMouseDown = false;
+  private editorDirty = false;
   private disposed = false;
 
   async initialize(): Promise<void> {
@@ -141,14 +142,15 @@ export class ContentController {
     }
 
     await this.refreshPreferences();
-    await this.restoreHighlights();
-    await this.refreshSidebarData(true);
-
     if (this.disposed || await isHostnameDisabled(this.hostname)) {
       this.deactivate();
       return;
     }
 
+    // Register the listeners and mark the page active *before* the restore calls. Those calls go
+    // through the background service worker, and one failed round trip (a cold start, or a
+    // just-updated extension) used to leave the tab with no listeners at all — highlighting, the
+    // sidebar and the popup's "enabled" badge all lied, with no way to recover short of navigating.
     document.addEventListener("mousedown", this.handleMouseDown, true);
     document.addEventListener("mouseup", this.handleMouseUp, true);
     document.addEventListener("pointercancel", this.clearUiMouseDown, true);
@@ -158,6 +160,14 @@ export class ContentController {
     document.addEventListener("pointerout", this.handleHighlightPointerOut, true);
     window.addEventListener("blur", this.clearUiMouseDown);
     this.pageActive = true;
+
+    try {
+      await this.restoreHighlights();
+      await this.refreshSidebarData(true);
+    } catch (error) {
+      // Rendering can be retried by the next storage change or navigation; the page stays usable.
+      this.reportError("initial highlight restore", error);
+    }
   }
 
   private deactivate(): void {
@@ -432,7 +442,11 @@ export class ContentController {
     }
 
     this.aiRequestId += 1;
-    this.mounts.hidePopover();
+    // Clicking the page while the note editor holds unsaved edits used to unmount it and throw the
+    // text away with no warning. Leave it open — "cancel" and "save" are the explicit ways out.
+    if (!this.editorDirty) {
+      this.mounts.hidePopover();
+    }
 
     const highlightEl = target?.closest?.(".liucai-highlight") as HTMLElement | null;
     if (!highlightEl) return;
@@ -723,6 +737,7 @@ export class ContentController {
     focus: EditorFocus = "note",
   ): void {
     this.ignorePageClickUntilMouseDown = true;
+    this.editorDirty = false;
     const safeRecord = normalizeHighlightRecord(record);
     const node = this.mounts.showPopover(
       left,
@@ -731,11 +746,11 @@ export class ContentController {
         copy={this.contentCopy}
         record={safeRecord}
         focus={focus}
+        onDirtyChange={(dirty) => {
+          this.editorDirty = dirty;
+        }}
         onCancel={() => this.mounts.hidePopover()}
-        onSave={(id, note, tags) => this.runAsync(
-          "save highlight meta",
-          () => this.saveHighlightMeta(id, note, tags),
-        )}
+        onSave={(id, note, tags) => this.saveHighlightMeta(id, note, tags)}
       />,
     );
     this.mounts.fitPopoverInViewport(node);
@@ -839,12 +854,21 @@ export class ContentController {
     if (!selector) return;
     const displayText = getRangeDisplayText(range);
 
+    // Freeze the page identity before awaiting. Otherwise a navigation landing during the round trip
+    // pairs the old page id with the new canonical url, and the span gets wrapped into a range that
+    // is no longer in the document — an invisible highlight plus a record that points at two pages.
+    const canonicalUrl = this.identity.canonicalUrl;
     const page = await this.getCurrentPage();
+    if (this.disposed || !this.pageActive || this.identity.canonicalUrl !== canonicalUrl) {
+      this.currentSelectionRange = null;
+      return;
+    }
+
     const now = new Date().toISOString();
     const highlight: HighlightRecord = {
       id: generateUuid(),
       pageId: page.id,
-      canonicalUrl: this.identity.canonicalUrl,
+      canonicalUrl,
       text: displayText || selector.exact,
       color,
       note: options.initialNote ?? "",
@@ -888,7 +912,8 @@ export class ContentController {
     tags: string[],
   ): Promise<void> {
     const record = await getHighlight(id);
-    if (!record) return;
+    // Throw rather than returning quietly: the popover shows a failure state from this rejection.
+    if (!record) throw new Error(`HIGHLIGHT_NOT_FOUND:${id}`);
 
     const updated: HighlightRecord = {
       ...normalizeHighlightRecord(record),
@@ -907,7 +932,7 @@ export class ContentController {
     color: HighlightColor,
   ): Promise<void> {
     const record = await getHighlight(id);
-    if (!record) return;
+    if (!record) throw new Error(`HIGHLIGHT_NOT_FOUND:${id}`);
 
     const updated: HighlightRecord = {
       ...normalizeHighlightRecord(record),
@@ -986,7 +1011,9 @@ export class ContentController {
 
   private async deleteHighlight(id: string): Promise<void> {
     const record = await getHighlight(id);
-    if (!record) return;
+    // Throw rather than returning quietly: the sidebar waits on this promise, and a silent
+    // "success" left its delete button stuck on "deleting" with both buttons disabled.
+    if (!record) throw new Error(`HIGHLIGHT_NOT_FOUND:${id}`);
 
     const now = new Date().toISOString();
     await putHighlight({
@@ -1113,5 +1140,11 @@ export class ContentController {
 }
 
 function normalizeHighlightRecord(record: HighlightRecord): HighlightRecord {
-  return { ...record, tags: Array.isArray(record.tags) ? record.tags : [] };
+  // Every consumer trims `note` directly (the note editor, the Obsidian export, the sidebar), so a
+  // record stored before that field existed must not reach them as undefined.
+  return {
+    ...record,
+    note: typeof record.note === "string" ? record.note : "",
+    tags: Array.isArray(record.tags) ? record.tags : [],
+  };
 }

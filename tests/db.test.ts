@@ -292,6 +292,27 @@ test("stops retrying a mutation that keeps failing so it cannot freeze the queue
   assert.equal((await storage.getOutboxBatch(100, new Date(8640000000000000))).length, 1);
 });
 
+test("fills in a missing note so consumers can trim it", async () => {
+  // A record stored before `note` existed; every consumer calls note.trim() on it.
+  await storage.db.highlights.add({
+    id: "legacy-record",
+    pageId: "page-1",
+    canonicalUrl: "https://example.com/article",
+    text: "Selected text",
+    color: "gold",
+    note: undefined as unknown as string,
+    tags: undefined as unknown as string[],
+    selector: { exact: "Selected text", prefix: "", suffix: "", start: 0, end: 13 },
+    createdAt: "2026-09-09T00:00:00.000Z",
+    updatedAt: "2026-09-09T00:00:00.000Z",
+  });
+
+  const loaded = await storage.getHighlight("legacy-record");
+
+  assert.equal(loaded?.note, "");
+  assert.deepEqual(loaded?.tags, []);
+});
+
 function createHighlight(pageId: string): HighlightRecord {
   return {
     id: "highlight-1",
