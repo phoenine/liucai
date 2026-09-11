@@ -80,13 +80,61 @@ test("does not write tooltip content into highlight DOM attributes", async () =>
   assert.doesNotMatch(source, /dataset\.tooltip/);
 });
 
+test("does not wrap whitespace-only ranges or put --last on blank spans", async () => {
+  const source = await readFile(
+    new URL("../src/highlightDom.ts", import.meta.url),
+    "utf8",
+  );
+
+  assert.match(source, /if \(!range\.toString\(\)\.trim\(\)\) \{\s*return \[\];/s);
+  assert.match(source, /if \(!selectedRange\.toString\(\)\.trim\(\)\) \{\s*continue;/s);
+  assert.match(source, /if \(spans\[index\]\.textContent\?\.trim\(\)\) \{\s*spans\[index\]\.classList\.add\("liucai-highlight--last"\)/s);
+});
+
 test("uses note and tag presence flags to select tooltip highlights", async () => {
   const source = await readFile(
     new URL("../src/contentController.tsx", import.meta.url),
     "utf8",
   );
 
-  assert.match(source, /data-has-note="true"/);
-  assert.match(source, /data-has-tags="true"/);
+  assert.match(source, /closest\?\.\("\.liucai-highlight"\)/);
+  assert.match(source, /dataset\.hasNote === "true"/);
+  assert.match(source, /dataset\.hasTags === "true"/);
+  assert.doesNotMatch(source, /liucai-highlight--last:is/);
   assert.doesNotMatch(source, /\[data-tooltip\]/);
+});
+
+test("keeps tooltip visible when the pointer moves between spans of the same highlight", async () => {
+  const source = await readFile(
+    new URL("../src/contentController.tsx", import.meta.url),
+    "utf8",
+  );
+
+  assert.match(source, /other\.dataset\.id === id/);
+});
+
+test("wraps a highlight range once per block without extracting content before insert", async () => {
+  const source = await readFile(
+    new URL("../src/highlightDom.ts", import.meta.url),
+    "utf8",
+  );
+
+  assert.match(source, /groupTextNodesByBlock/);
+  assert.match(source, /range\.surroundContents\(span\)/);
+  assert.doesNotMatch(source, /extractContents/);
+});
+
+test("classifies tags in one shared module instead of per-consumer lists", async () => {
+  const [highlightSource, blockSource, tagsSource] = await Promise.all([
+    readFile(new URL("../src/highlightDom.ts", import.meta.url), "utf8"),
+    readFile(new URL("../src/rangeDisplayText.ts", import.meta.url), "utf8"),
+    readFile(new URL("../src/domTags.ts", import.meta.url), "utf8"),
+  ]);
+
+  assert.match(tagsSource, /"BLOCKQUOTE"/);
+  assert.match(tagsSource, /"TD"/);
+  // Inline tags must stay out of the block list, or the two classifications merge by accident.
+  assert.doesNotMatch(tagsSource, /"BUTTON"|"RUBY"|"SPAN"/);
+  assert.doesNotMatch(highlightSource, /PHRASING_TAGS|DISPLAY_BLOCK_TAGS/);
+  assert.doesNotMatch(blockSource, /PHRASING_TAGS|DISPLAY_BLOCK_TAGS/);
 });

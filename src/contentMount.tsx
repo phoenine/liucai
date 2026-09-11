@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { createRoot, type Root } from "react-dom/client";
-import { placeTooltip, TOOLTIP_COLORS } from "./highlightTooltip";
+import { clientRectNearPoint, placeTooltip } from "./highlightTooltip";
 import type { HighlightColor } from "./types";
 
 type MountedRoot = { root: Root; node: HTMLElement } | null;
@@ -73,12 +73,16 @@ export class ContentMounts {
     this.sidebar = this.renderInto(node, children);
   }
 
-  showHighlightTooltip(anchor: HTMLElement, color: HighlightColor, children: ReactNode): void {
+  showHighlightTooltip(
+    anchor: HTMLElement,
+    color: HighlightColor,
+    children: ReactNode,
+    pointer?: { x: number; y: number },
+  ): void {
     this.hideHighlightTooltip();
     const node = document.createElement("div");
     node.className = "liucai-highlight-tooltip";
     node.dataset.color = color;
-    node.style.backgroundColor = TOOLTIP_COLORS[color];
     node.style.visibility = "hidden";
     document.body.append(node);
     const mounted = this.renderInto(node, children);
@@ -88,8 +92,11 @@ export class ContentMounts {
       if (this.highlightTooltip !== mounted || !node.isConnected || !anchor.isConnected) {
         return;
       }
+      const anchorRect = pointer
+        ? clientRectNearPoint(anchor.getClientRects(), pointer.x, pointer.y) ?? anchor.getBoundingClientRect()
+        : anchor.getBoundingClientRect();
       const position = placeTooltip(
-        anchor.getBoundingClientRect(),
+        anchorRect,
         node.getBoundingClientRect(),
         { width: window.innerWidth, height: window.innerHeight },
       );
@@ -106,6 +113,10 @@ export class ContentMounts {
 
   hidePopover(): void {
     this.popover = this.unmount(this.popover);
+  }
+
+  hasPopover(): boolean {
+    return this.popover !== null;
   }
 
   hideSidebar(): void {

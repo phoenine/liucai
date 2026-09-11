@@ -7,7 +7,7 @@ import {
   PaletteIcon,
   TranslateIcon,
 } from "@phosphor-icons/react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { createRoot } from "react-dom/client";
 import { getOptionsCopy, resolveInterfaceLocale } from "./localization";
 import {
@@ -28,6 +28,7 @@ import {
   type InterfaceLanguage,
   type LiucaiPreferencesV1,
 } from "./preferences";
+import { HIGHLIGHT_ACCENT } from "./highlightTooltip";
 import type { HighlightColor } from "./types";
 import "./options.css";
 
@@ -263,7 +264,12 @@ function OptionsApp() {
                     type="radio"
                     value={color}
                   />
-                  <span aria-hidden="true" className="lc-options__color-swatch" data-color={color} />
+                  <span
+                    aria-hidden="true"
+                    className="lc-options__color-swatch"
+                    data-color={color}
+                    style={{ "--liucai-accent": HIGHLIGHT_ACCENT[color] } as CSSProperties}
+                  />
                   <span className="lc-options__color-copy">
                     <strong>{option.label}</strong>
                     <small>{option.description}</small>

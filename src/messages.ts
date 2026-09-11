@@ -1,4 +1,4 @@
-import type { HighlightRecord, PageRecord } from "./types";
+import type { HighlightRecord } from "./types";
 
 export const AI_AUTH_STATE_STORAGE_KEY = "liucai.ai.signedIn";
 
@@ -24,8 +24,7 @@ export interface SyncStatus {
 
 export interface AiExplanation {
   concept: string;
-  summary: string;
-  contextualMeaning: string;
+  explanation: string;
 }
 
 export interface AiExample {
@@ -82,12 +81,7 @@ export type StorageRequest =
   | { type: "LIUCAI_STORAGE_GET_ACTIVE_HIGHLIGHTS"; canonicalUrl: string }
   | { type: "LIUCAI_STORAGE_GET_HIGHLIGHT"; id: string }
   | { type: "LIUCAI_STORAGE_ADD_HIGHLIGHT"; record: HighlightRecord }
-  | { type: "LIUCAI_STORAGE_PUT_HIGHLIGHT"; record: HighlightRecord }
-  | {
-    type: "LIUCAI_STORAGE_IMPORT_LEGACY";
-    pages: PageRecord[];
-    highlights: HighlightRecord[];
-  };
+  | { type: "LIUCAI_STORAGE_PUT_HIGHLIGHT"; record: HighlightRecord };
 
 export type StorageResponse<T> =
   | { ok: true; data: T }
@@ -112,7 +106,6 @@ const STORAGE_MESSAGE_TYPES = new Set<StorageRequest["type"]>([
   "LIUCAI_STORAGE_GET_HIGHLIGHT",
   "LIUCAI_STORAGE_ADD_HIGHLIGHT",
   "LIUCAI_STORAGE_PUT_HIGHLIGHT",
-  "LIUCAI_STORAGE_IMPORT_LEGACY",
 ]);
 
 export function isStorageRequest(message: unknown): message is StorageRequest {

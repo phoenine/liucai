@@ -45,6 +45,23 @@ class LiucaiDatabase extends Dexie {
 
 export const db = new LiucaiDatabase();
 
+/**
+ * Limits enforced by the server (supabase/migrations/*_create_sync_schema.sql).
+ *
+ * Exceeding any of them rejects the batch as a whole, and because the oldest mutation sorts first,
+ * a single oversized record would keep every later one from ever syncing. Payloads are therefore
+ * clamped on their way into the outbox.
+ */
+const SERVER_LIMITS = {
+  url: 8192,
+  title: 4096,
+  text: 1_048_576,
+  tags: 100,
+} as const;
+
+/** Failures allowed before a mutation stops being retried in the ordinary batch. */
+const MAX_SYNC_ATTEMPTS = 8;
+
 export async function upsertPage(canonicalUrl: string, originalUrl: string, title: string): Promise<PageRecord> {
   return db.transaction("rw", db.pages, db.outbox, async () => {
     const now = new Date().toISOString();
@@ -114,48 +131,21 @@ export async function putHighlight(record: HighlightRecord): Promise<void> {
   });
 }
 
-export async function importLegacyRecords(
-  pages: PageRecord[],
-  highlights: HighlightRecord[],
-): Promise<void> {
-  await db.transaction("rw", db.pages, db.highlights, db.outbox, async () => {
-    const pageIds = new Map<string, string>();
-    for (const page of pages) {
-      const existing = await db.pages.where("canonicalUrl").equals(page.canonicalUrl).first();
-      pageIds.set(page.canonicalUrl, existing?.id ?? page.id);
-      if (!existing) {
-        await db.pages.put(page);
-        await enqueueSnapshot("page", page);
-      } else if (existing.updatedAt < page.updatedAt) {
-        const merged = { ...page, id: existing.id };
-        await db.pages.put(merged);
-        await enqueueSnapshot("page", merged);
-      }
-    }
-
-    for (const candidate of highlights) {
-      let pageId = pageIds.get(candidate.canonicalUrl);
-      if (!pageId) {
-        const page = await db.pages.where("canonicalUrl").equals(candidate.canonicalUrl).first();
-        pageId = page?.id;
-      }
-      const record = normalizeHighlightRecord({
-        ...candidate,
-        pageId: pageId ?? candidate.pageId,
-      });
-      const existing = await db.highlights.get(record.id);
-      if (!existing || existing.updatedAt < record.updatedAt) {
-        await db.highlights.put(record);
-        await enqueueSnapshot("highlight", record);
-      }
-    }
-  });
-}
-
+/**
+ * Pending mutations that are due to be sent.
+ *
+ * `now` is compared as a timestamp rather than as text. An ISO string for a far-future date
+ * starts with "+", which sorts *before* every ordinary date, so the text comparison silently
+ * inverted the "ignore the backoff" call that passes one.
+ * Mutations that keep failing are left out of the batch so one bad record cannot freeze the queue
+ * for everything behind it; `resetOutboxRetries` (the user-visible "sync now") puts them back in.
+ */
 export async function getOutboxBatch(limit = 100, now = new Date()): Promise<OutboxMutation[]> {
+  const cutoff = now.getTime();
   const records = await db.outbox.toArray();
   return records
-    .filter((record) => !record.nextAttemptAt || record.nextAttemptAt <= now.toISOString())
+    .filter((record) => (record.retryCount ?? 0) < MAX_SYNC_ATTEMPTS)
+    .filter((record) => !record.nextAttemptAt || Date.parse(record.nextAttemptAt) <= cutoff)
     .sort((left, right) => {
       if (left.entityType !== right.entityType) return left.entityType === "page" ? -1 : 1;
       return left.createdAt.localeCompare(right.createdAt) || left.mutationId.localeCompare(right.mutationId);
@@ -340,6 +330,25 @@ function cursorKey(userId: string): string {
   return `cursor:${userId}`;
 }
 
+function withinServerLimits(payload: PageRecord | HighlightRecord): PageRecord | HighlightRecord {
+  const canonicalUrl = payload.canonicalUrl.slice(0, SERVER_LIMITS.url);
+  if ("title" in payload) {
+    return {
+      ...payload,
+      canonicalUrl,
+      originalUrl: payload.originalUrl.slice(0, SERVER_LIMITS.url),
+      title: payload.title.slice(0, SERVER_LIMITS.title),
+    };
+  }
+  return {
+    ...payload,
+    canonicalUrl,
+    text: payload.text.slice(0, SERVER_LIMITS.text),
+    note: payload.note.slice(0, SERVER_LIMITS.text),
+    tags: payload.tags.slice(0, SERVER_LIMITS.tags),
+  };
+}
+
 async function enqueueSnapshot(
   entityType: SyncEntityType,
   payload: PageRecord | HighlightRecord,
@@ -349,7 +358,7 @@ async function enqueueSnapshot(
     entityType,
     entityId: payload.id,
     operation: "deletedAt" in payload && payload.deletedAt ? "delete" : "upsert",
-    payload,
+    payload: withinServerLimits(payload),
     createdAt: new Date().toISOString(),
     retryCount: 0,
   });

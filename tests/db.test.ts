@@ -81,36 +81,6 @@ test("writes highlight snapshots and tombstones to the outbox", async () => {
   assert.equal((await storage.getHighlight(highlight.id))?.deletedAt, "2026-09-09T00:01:00.000Z");
 });
 
-test("merges legacy pages by canonical URL and remaps highlight page IDs", async () => {
-  const current = await storage.upsertPage(
-    "https://example.com/article",
-    "https://example.com/article",
-    "Current",
-  );
-  await storage.db.outbox.clear();
-
-  const legacyPage: PageRecord = {
-    id: "legacy-page",
-    canonicalUrl: "https://example.com/article",
-    originalUrl: "https://example.com/article?from=legacy",
-    title: "Legacy title",
-    createdAt: "2026-01-01T00:00:00.000Z",
-    updatedAt: "2099-01-01T00:00:00.000Z",
-    lastOpenedAt: "2099-01-01T00:00:00.000Z",
-  };
-  const legacyHighlight = createHighlight(legacyPage.id);
-
-  await storage.importLegacyRecords([legacyPage], [legacyHighlight]);
-  await storage.importLegacyRecords([legacyPage], [legacyHighlight]);
-
-  const mergedPage = await storage.db.pages.where("canonicalUrl").equals(legacyPage.canonicalUrl).first();
-  assert.equal(await storage.db.pages.count(), 1);
-  assert.equal(mergedPage?.id, current.id);
-  assert.equal(mergedPage?.title, "Legacy title");
-  assert.equal((await storage.getHighlight(legacyHighlight.id))?.pageId, current.id);
-  assert.equal(await storage.db.outbox.count(), 2);
-});
-
 test("applies acknowledged remote changes and advances the account cursor atomically", async () => {
   const localPage = await storage.upsertPage(
     "https://example.com/article",
@@ -273,6 +243,53 @@ test("first account binding queues a complete page-first bootstrap exactly once"
 
   await storage.bindLocalDatabaseToUser("user-a");
   assert.equal(await storage.db.outbox.count(), 2);
+});
+
+test("ignores the recorded backoff when handed a far-future now", async () => {
+  await storage.upsertPage(
+    "https://example.com/backoff",
+    "https://example.com/backoff",
+    "Backoff",
+  );
+  const [pending] = await storage.getOutboxBatch();
+  await storage.recordSyncFailure([pending.mutationId], "server rejected the batch");
+
+  // While the backoff runs, an ordinary read must hold the record back...
+  assert.equal((await storage.getOutboxBatch(100, new Date())).length, 0);
+  // ...but a far-future "now" is how the sync loop asks for "ignore the backoff". Comparing that
+  // date as text used to sort it before every real date and hide the record instead of unearthing it.
+  assert.equal((await storage.getOutboxBatch(100, new Date(8640000000000000))).length, 1);
+});
+
+test("clamps queued payloads to the server-side limits", async () => {
+  const longUrl = `https://example.com/${"a".repeat(9000)}`;
+  const page = await storage.upsertPage(longUrl, longUrl, "t".repeat(5000));
+  const [mutation] = await storage.getOutboxBatch();
+  const payload = mutation.payload as PageRecord;
+
+  // The outbox copy is trimmed so the server cannot reject the whole batch over it...
+  assert.ok(payload.canonicalUrl.length <= 8192);
+  assert.ok(payload.title.length <= 4096);
+  // ...while the local record keeps everything.
+  assert.equal(page.canonicalUrl.length, longUrl.length);
+  assert.equal(page.title.length, 5000);
+});
+
+test("stops retrying a mutation that keeps failing so it cannot freeze the queue", async () => {
+  await storage.upsertPage("https://example.com/stuck", "https://example.com/stuck", "Stuck");
+  const [pending] = await storage.getOutboxBatch();
+
+  for (let attempt = 0; attempt < 8; attempt += 1) {
+    await storage.recordSyncFailure([pending.mutationId], "server said no");
+  }
+
+  // Still queued locally, but no longer dragging everything behind it down.
+  assert.equal(await storage.db.outbox.count(), 1);
+  assert.equal((await storage.getOutboxBatch(100, new Date(8640000000000000))).length, 0);
+
+  // "Sync now" puts it back in.
+  await storage.resetOutboxRetries();
+  assert.equal((await storage.getOutboxBatch(100, new Date(8640000000000000))).length, 1);
 });
 
 function createHighlight(pageId: string): HighlightRecord {

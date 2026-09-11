@@ -13,11 +13,10 @@ import {
   type EditorFocus,
 } from "./contentUi";
 import { appendNote, formatAiExplanationNote } from "./aiNote";
-import { createSelectorFromRange, rangesFromSelectors } from "./domText";
+import { createSelectorFromRange, LIUCAI_UI_SELECTOR, rangesFromSelectors } from "./domText";
 import { applyHighlight, removeHighlightFromDom, updateHighlightAttributes } from "./highlightDom";
 import { HoverRequestTracker } from "./hoverRequest";
 import { generateUuid } from "./id";
-import { migrateLegacySiteData } from "./legacyMigration";
 import {
   AI_AUTH_STATE_STORAGE_KEY,
   isPageStatusRequest,
@@ -77,6 +76,8 @@ const INTERACTIVE_CONTENT_SELECTOR = [
   "[contenteditable='true']",
 ].join(",");
 
+const LIUCAI_POINTER_UI_SELECTOR = `${LIUCAI_UI_SELECTOR},.liucai-highlight-tooltip`;
+
 const LOCATION_CHECK_INTERVAL_MS = 750;
 const PAGE_SETTLE_DELAY_MS = 50;
 
@@ -97,6 +98,8 @@ export class ContentController {
   private locationTimer: number | null = null;
   private selectionRequestId = 0;
   private aiRequestId = 0;
+  private mouseDownStartedInUi = false;
+  private ignorePageClickUntilMouseDown = false;
   private disposed = false;
 
   async initialize(): Promise<void> {
@@ -106,9 +109,6 @@ export class ContentController {
     window.addEventListener("hashchange", this.checkLocation);
     window.addEventListener("popstate", this.checkLocation);
     this.locationTimer = window.setInterval(this.checkLocation, LOCATION_CHECK_INTERVAL_MS);
-    await migrateLegacySiteData().catch((error) => {
-      this.reportError("legacy data migration", error);
-    });
     await this.transitions.run(() => this.syncActivation());
   }
 
@@ -142,30 +142,38 @@ export class ContentController {
 
     await this.refreshPreferences();
     await this.restoreHighlights();
-    await this.refreshSidebarData();
+    await this.refreshSidebarData(true);
 
     if (this.disposed || await isHostnameDisabled(this.hostname)) {
       this.deactivate();
       return;
     }
 
+    document.addEventListener("mousedown", this.handleMouseDown, true);
     document.addEventListener("mouseup", this.handleMouseUp, true);
+    document.addEventListener("pointercancel", this.clearUiMouseDown, true);
     document.addEventListener("keydown", this.handleKeyDown, true);
     document.addEventListener("click", this.handleDocumentClickEvent, true);
     document.addEventListener("pointerover", this.handleHighlightPointerOver, true);
     document.addEventListener("pointerout", this.handleHighlightPointerOut, true);
+    window.addEventListener("blur", this.clearUiMouseDown);
     this.pageActive = true;
   }
 
   private deactivate(): void {
+    document.removeEventListener("mousedown", this.handleMouseDown, true);
     document.removeEventListener("mouseup", this.handleMouseUp, true);
+    document.removeEventListener("pointercancel", this.clearUiMouseDown, true);
     document.removeEventListener("keydown", this.handleKeyDown, true);
     document.removeEventListener("click", this.handleDocumentClickEvent, true);
     document.removeEventListener("pointerover", this.handleHighlightPointerOver, true);
     document.removeEventListener("pointerout", this.handleHighlightPointerOut, true);
+    window.removeEventListener("blur", this.clearUiMouseDown);
     this.pageActive = false;
     this.sidebarOpen = false;
     this.currentSelectionRange = null;
+    this.mouseDownStartedInUi = false;
+    this.ignorePageClickUntilMouseDown = false;
     this.aiRequestId += 1;
     this.hoverRequests.clear();
     this.mounts.hideAll();
@@ -183,6 +191,14 @@ export class ContentController {
     this.observedHref = nextHref;
     if (!hasPageIdentityChanged(this.identity, nextHref)) {
       this.identity = createPageIdentity(nextHref);
+      // switchPage() deactivates before it settles, so a URL that changes to a same-canonical
+      // variant inside that window lands here with the page already torn down. Nothing else would
+      // bring it back: the next checkLocation() sees href === observedHref and returns at once.
+      if (!this.pageActive) {
+        void this.transitions
+          .run(() => this.syncActivation())
+          .catch((error) => this.reportError("page activation", error));
+      }
       return;
     }
 
@@ -254,9 +270,13 @@ export class ContentController {
 
   private async refreshSyncedPage(): Promise<void> {
     if (!this.pageActive || this.disposed) return;
+    if (this.mounts.hasPopover()) {
+      await this.restoreHighlights();
+      await this.refreshSidebarData();
+      return;
+    }
     this.aiRequestId += 1;
     this.mounts.hideToolbar();
-    this.mounts.hidePopover();
     for (const span of Array.from(document.querySelectorAll<HTMLElement>(".liucai-highlight"))) {
       span.replaceWith(...Array.from(span.childNodes));
     }
@@ -300,13 +320,12 @@ export class ContentController {
   }
 
   private handleMouseUp = (event: MouseEvent): void => {
-    if (
-      (event.target as Element | null)?.closest?.(
-        ".liucai-toolbar,.liucai-popover,.liucai-sidebar,.liucai-mini-sidebar",
-      )
-    ) {
+    const startedInUi = this.mouseDownStartedInUi;
+    if (startedInUi || this.isLiucaiUiTarget(event.target)) {
+      window.setTimeout(this.clearUiMouseDown, 0);
       return;
     }
+    this.mouseDownStartedInUi = false;
 
     const requestId = ++this.selectionRequestId;
     const selection = window.getSelection();
@@ -339,8 +358,24 @@ export class ContentController {
   };
 
   private handleDocumentClickEvent = (event: MouseEvent): void => {
+    const startedInUi = this.mouseDownStartedInUi;
+    this.mouseDownStartedInUi = false;
+    if (startedInUi || this.ignorePageClickUntilMouseDown) return;
     this.runAsync("handle highlight click", () => this.handleDocumentClick(event));
   };
+
+  private handleMouseDown = (event: MouseEvent): void => {
+    this.ignorePageClickUntilMouseDown = false;
+    this.mouseDownStartedInUi = this.isLiucaiUiTarget(event.target);
+  };
+
+  private clearUiMouseDown = (): void => {
+    this.mouseDownStartedInUi = false;
+  };
+
+  private isLiucaiUiTarget(target: EventTarget | null): boolean {
+    return target instanceof Element && Boolean(target.closest(LIUCAI_POINTER_UI_SELECTOR));
+  }
 
   private handleHighlightPointerOver = (event: PointerEvent): void => {
     const highlight = this.getTooltipHighlight(event.target);
@@ -368,6 +403,7 @@ export class ContentController {
         highlight,
         normalized.color,
         <HighlightTooltip note={normalized.note} tags={normalized.tags} />,
+        { x: event.clientX, y: event.clientY },
       );
     });
   };
@@ -386,11 +422,7 @@ export class ContentController {
 
   private async handleDocumentClick(event: MouseEvent): Promise<void> {
     const target = event.target as Element | null;
-    if (
-      target?.closest?.(
-        ".liucai-toolbar,.liucai-popover,.liucai-sidebar,.liucai-mini-sidebar",
-      )
-    ) {
+    if (this.isLiucaiUiTarget(target)) {
       return;
     }
 
@@ -690,6 +722,7 @@ export class ContentController {
     top: number,
     focus: EditorFocus = "note",
   ): void {
+    this.ignorePageClickUntilMouseDown = true;
     const safeRecord = normalizeHighlightRecord(record);
     const node = this.mounts.showPopover(
       left,
@@ -708,8 +741,17 @@ export class ContentController {
     this.mounts.fitPopoverInViewport(node);
   }
 
-  private async refreshSidebarData(): Promise<void> {
+  /**
+   * `force` belongs to the activation path, which renders before it flips `pageActive`. Every
+   * other caller arrives after an `await`, so it must confirm the page is still live: a late IPC
+   * reply used to remount the mini sidebar on a page that had already been deactivated, including
+   * on a site the user had just disabled from the popup.
+   */
+  private async refreshSidebarData(force = false): Promise<void> {
     const records = await getActiveHighlights(this.identity.canonicalUrl);
+    if (this.disposed || (!force && !this.pageActive)) {
+      return;
+    }
     this.renderMiniSidebar(records.length);
     if (this.sidebarOpen) {
       this.renderSidebar(records);
@@ -728,6 +770,9 @@ export class ContentController {
   }
 
   private async toggleSidebar(): Promise<void> {
+    if (this.disposed || !this.pageActive) {
+      return;
+    }
     if (this.sidebarOpen) {
       this.mounts.hideSidebar();
       this.sidebarOpen = false;
@@ -782,6 +827,9 @@ export class ContentController {
     color: HighlightColor,
     options: { openEditor: boolean; focus?: EditorFocus; initialNote?: string },
   ): Promise<void> {
+    if (options.openEditor) {
+      this.ignorePageClickUntilMouseDown = true;
+    }
     const range = this.currentSelectionRange;
     this.mounts.hideToolbar();
     window.getSelection()?.removeAllRanges();
@@ -1011,16 +1059,32 @@ export class ContentController {
   }
 
   private getTooltipHighlight(target: EventTarget | null): HTMLElement | null {
-    return (target as Element | null)?.closest?.(
-      '.liucai-highlight--last:is([data-has-note="true"],[data-has-tags="true"])',
-    ) as HTMLElement | null;
+    const highlight = (target as Element | null)?.closest?.(".liucai-highlight") as HTMLElement | null;
+    if (!highlight) {
+      return null;
+    }
+    if (highlight.dataset.hasNote === "true" || highlight.dataset.hasTags === "true") {
+      return highlight;
+    }
+    return null;
   }
 
   private isInsideHighlight(
     highlight: HTMLElement,
     target: EventTarget | null,
   ): boolean {
-    return target instanceof Node && highlight.contains(target);
+    if (!(target instanceof Node)) {
+      return false;
+    }
+    if (highlight.contains(target)) {
+      return true;
+    }
+    const id = highlight.dataset.id;
+    if (!id || !(target instanceof Element)) {
+      return false;
+    }
+    const other = target.closest(".liucai-highlight");
+    return other instanceof HTMLElement && other.dataset.id === id;
   }
 
   private runAsync(label: string, task: () => Promise<void>): void {

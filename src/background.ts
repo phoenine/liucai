@@ -2,7 +2,6 @@ import {
   addHighlight,
   getActiveHighlights,
   getHighlight,
-  importLegacyRecords,
   putHighlight,
   upsertPage,
 } from "./db";
@@ -110,8 +109,6 @@ async function handleStorageRequest(request: StorageRequest): Promise<unknown> {
       return addHighlight(request.record);
     case "LIUCAI_STORAGE_PUT_HIGHLIGHT":
       return putHighlight(request.record);
-    case "LIUCAI_STORAGE_IMPORT_LEGACY":
-      return importLegacyRecords(request.pages, request.highlights);
   }
 }
 

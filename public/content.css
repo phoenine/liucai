@@ -1,9 +1,7 @@
 .liucai-highlight {
-  border-radius: 3px;
-  box-decoration-break: clone;
-  -webkit-box-decoration-break: clone;
+  border-radius: 2px;
   cursor: pointer;
-  padding: 0 1px;
+  padding: 0.08em 0;
   transition: box-shadow 160ms ease, filter 160ms ease;
 }
 
@@ -289,25 +287,85 @@
   margin: 0 0 12px;
 }
 
-.liucai-ai-card__section {
-  background: #f8fafc;
-  border-radius: 10px;
-  margin-top: 8px;
-  padding: 10px 11px;
-}
-
-.liucai-ai-card__section > span {
-  color: #64748b;
-  display: block;
-  font: 700 11px/1.2 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  margin-bottom: 5px;
-}
-
-.liucai-ai-card__section p,
-.liucai-ai-card__hint {
+.liucai-ai-card__explanation {
   color: #334155;
   font: 13px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  margin: 0 0 2px;
+}
+
+.liucai-markdown {
+  color: inherit;
+  font: inherit;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.liucai-markdown :is(p, ul, ol, blockquote, pre) {
+  color: inherit;
+  font: inherit;
   margin: 0;
+}
+
+.liucai-markdown p {
+  white-space: pre-wrap;
+}
+
+.liucai-markdown > :not(:first-child) {
+  margin-top: 7px;
+}
+
+.liucai-markdown :is(ul, ol) {
+  display: block;
+  list-style-position: outside;
+  padding-left: 20px;
+}
+
+.liucai-markdown li {
+  color: inherit;
+  display: list-item;
+  font: inherit;
+  list-style-type: inherit;
+  margin-top: 3px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.liucai-markdown li:first-child {
+  margin-top: 0;
+}
+
+.liucai-markdown strong {
+  font-weight: 700;
+}
+
+.liucai-markdown em {
+  font-style: italic;
+}
+
+.liucai-markdown blockquote {
+  border-left: 2px solid currentColor;
+  opacity: 0.82;
+  padding-left: 8px;
+}
+
+.liucai-markdown code {
+  background: #f1f5f9;
+  border-radius: 4px;
+  font: 12px/1.5 ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  padding: 1px 4px;
+}
+
+.liucai-markdown pre {
+  background: #f1f5f9;
+  border-radius: 8px;
+  overflow-x: auto;
+  padding: 8px 9px;
+  white-space: pre;
+}
+
+.liucai-markdown pre code {
+  background: transparent;
+  padding: 0;
 }
 
 .liucai-ai-card__example {
@@ -316,14 +374,13 @@
   font: 13px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   margin-top: 10px;
   padding: 5px 0 5px 10px;
-  white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
 
 .liucai-ai-card__hint {
   color: #64748b;
-  font-size: 11px;
-  margin-top: 9px;
+  font: 11px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  margin: 9px 0 0;
 }
 
 .liucai-ai-card__hint.is-warning,
@@ -416,9 +473,9 @@
   box-sizing: border-box;
   position: fixed;
   z-index: 2147483647;
-  border: 1px solid rgba(17, 24, 39, 0.12);
+  border: 1px solid rgba(79, 107, 138, 0.14);
   border-radius: 10px;
-  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.18);
+  box-shadow: 0 6px 18px rgba(42, 35, 20, 0.08);
   color: #111827;
   font: 13.5px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   max-width: 300px;
@@ -427,29 +484,58 @@
   pointer-events: none;
   text-align: left;
   white-space: pre-wrap;
+  background: var(--liucai-soft);
+}
+
+.liucai-highlight-tooltip[data-color="gold"],
+.liucai-sidebar-item[data-color="gold"] {
+  --liucai-soft: #fff7dc;
+  --liucai-accent: #ffea70;
+  --liucai-marker: #a85d35;
+}
+
+.liucai-highlight-tooltip[data-color="mint"],
+.liucai-sidebar-item[data-color="mint"] {
+  --liucai-soft: #e8fbf5;
+  --liucai-accent: #4df4c9;
+  --liucai-marker: #13795b;
+}
+
+.liucai-highlight-tooltip[data-color="coral"],
+.liucai-sidebar-item[data-color="coral"] {
+  --liucai-soft: #fff0ec;
+  --liucai-accent: #ffafa1;
+  --liucai-marker: #b94a3b;
 }
 
 .liucai-highlight-tooltip__note {
   all: initial;
-  background: #fff7ed;
+  background: transparent;
   border-radius: 8px;
-  color: #92400e;
+  color: #3f4147;
   display: block;
   font: 12px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  padding: 6px 8px;
+  padding: 2px 0 0;
+  pointer-events: none;
+}
+
+.liucai-highlight-tooltip .liucai-markdown li::marker,
+.liucai-sidebar-item__note .liucai-markdown li::marker {
+  color: var(--liucai-marker);
+  font-weight: 700;
 }
 
 .liucai-highlight-tooltip__tags {
   display: flex;
   flex-wrap: wrap;
   gap: 4px;
-  margin-top: 7px;
+  margin-top: 8px;
 }
 
 .liucai-highlight-tooltip__tags span {
-  background: #eff6ff;
+  background: #edf2f7;
   border-radius: 999px;
-  color: #2563eb;
+  color: #4f6b8a;
   font: 700 10px/1 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   padding: 4px 6px;
 }
@@ -718,9 +804,7 @@
   padding: 8px;
 }
 
-.liucai-sidebar-item[data-color="gold"] { background: #fffbe6; }
-.liucai-sidebar-item[data-color="mint"] { background: #ecfff9; }
-.liucai-sidebar-item[data-color="coral"] { background: #fff1ee; }
+.liucai-sidebar-item[data-color] { background: var(--liucai-soft); }
 
 .liucai-sidebar-item:hover {
   box-shadow: 0 6px 18px rgba(15, 23, 42, 0.12);
@@ -759,9 +843,10 @@
   width: 10px;
 }
 
-.liucai-sidebar-item[data-color="gold"] .liucai-sidebar-item__dot { background: #ffea70; }
-.liucai-sidebar-item[data-color="mint"] .liucai-sidebar-item__dot { background: #4df4c9; }
-.liucai-sidebar-item[data-color="coral"] .liucai-sidebar-item__dot { background: #ffaFA1; }
+.liucai-sidebar-item[data-color] .liucai-sidebar-item__line,
+.liucai-sidebar-item[data-color] .liucai-sidebar-item__dot {
+  background: var(--liucai-accent);
+}
 
 .liucai-sidebar-item__index {
   color: #9ca3af;
@@ -775,10 +860,6 @@
   opacity: 0.68;
   width: 2px;
 }
-
-.liucai-sidebar-item[data-color="gold"] .liucai-sidebar-item__line { background: #ffea70; }
-.liucai-sidebar-item[data-color="mint"] .liucai-sidebar-item__line { background: #4df4c9; }
-.liucai-sidebar-item[data-color="coral"] .liucai-sidebar-item__line { background: #ffaFA1; }
 
 .liucai-sidebar-item__rail:hover .liucai-sidebar-item__line {
   opacity: 1;
@@ -794,74 +875,26 @@
 
 .liucai-sidebar-item__note {
   all: initial;
-  background: #fff7ed;
+  background: transparent;
   border-radius: 10px;
-  color: #92400e;
+  color: #3f4147;
   display: block;
   font: 12px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   margin: 7px 0 0;
-  padding: 6px 8px;
-}
-
-.liucai-note-paragraph,
-.liucai-note-list,
-.liucai-note-list li {
-  color: inherit;
-  font: inherit;
-}
-
-.liucai-note-paragraph {
-  display: block;
-  margin: 0;
-  min-width: 0;
-  overflow-wrap: anywhere;
-  white-space: pre-wrap;
-}
-
-.liucai-note-list {
-  display: block;
-  list-style-position: outside;
-  margin: 0;
-  padding-left: 20px;
-}
-
-.liucai-note-paragraph + .liucai-note-list,
-.liucai-note-list + .liucai-note-paragraph,
-.liucai-note-list + .liucai-note-list {
-  margin-top: 6px;
-}
-
-.liucai-note-list--ordered {
-  list-style-type: decimal;
-}
-
-.liucai-note-list--unordered {
-  list-style-type: disc;
-}
-
-.liucai-note-list li {
-  display: list-item;
-  list-style-type: inherit;
-  margin-top: 3px;
-  min-width: 0;
-  overflow-wrap: anywhere;
-}
-
-.liucai-note-list li:first-child {
-  margin-top: 0;
+  padding: 2px 0 0;
 }
 
 .liucai-sidebar-item__tags {
   display: flex;
   flex-wrap: wrap;
   gap: 4px;
-  margin: 11px 0 0;
+  margin: 8px 0 0;
 }
 
 .liucai-sidebar-item__tags span {
-  background: #eff6ff;
+  background: #edf2f7;
   border-radius: 999px;
-  color: #2563eb;
+  color: #4f6b8a;
   font: 700 11px/1 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   padding: 5px 7px;
 }

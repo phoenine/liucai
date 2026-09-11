@@ -96,3 +96,12 @@ test("offers save feedback, a real connection test, and reduced-motion press fee
   assert.match(styles, /transform: scale\(0\.97\)/);
   assert.match(styles, /@media \(prefers-reduced-motion: reduce\)/);
 });
+
+test("uses shared accent colors for default-highlight swatches", async () => {
+  const options = await readFile(new URL("../src/options.tsx", import.meta.url), "utf8");
+  const styles = await readFile(new URL("../src/options.css", import.meta.url), "utf8");
+
+  assert.match(options, /HIGHLIGHT_ACCENT\[color\]/);
+  assert.match(styles, /\.lc-options__color-swatch\s*\{[^}]*background:\s*var\(--liucai-accent\);/s);
+  assert.doesNotMatch(styles, /color-swatch\[data-color="gold"\]/);
+});

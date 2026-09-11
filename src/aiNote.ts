@@ -9,15 +9,13 @@ export function formatAiExplanationNote(
   if (locale === "zh-CN") {
     return [
       `AI 解释｜${explanation.concept}`,
-      explanation.summary,
-      `当前语境：${explanation.contextualMeaning}`,
+      explanation.explanation,
       ...(example ? [`例子：${example}`] : []),
     ].join("\n");
   }
   return [
     `AI explanation | ${explanation.concept}`,
-    explanation.summary,
-    `In context: ${explanation.contextualMeaning}`,
+    explanation.explanation,
     ...(example ? [`Example: ${example}`] : []),
   ].join("\n");
 }

@@ -1,49 +1,10 @@
+import { isDisplayBlockTag } from "./domTags.ts";
+
 export type DisplayTextToken =
   | { type: "text"; value: string }
   | { type: "boundary" };
 
-const DISPLAY_BLOCK_TAGS = new Set([
-  "ADDRESS",
-  "ARTICLE",
-  "ASIDE",
-  "BLOCKQUOTE",
-  "DD",
-  "DIV",
-  "DL",
-  "DT",
-  "FIELDSET",
-  "FIGCAPTION",
-  "FIGURE",
-  "FOOTER",
-  "FORM",
-  "H1",
-  "H2",
-  "H3",
-  "H4",
-  "H5",
-  "H6",
-  "HEADER",
-  "HR",
-  "LI",
-  "MAIN",
-  "NAV",
-  "OL",
-  "P",
-  "PRE",
-  "SECTION",
-  "TABLE",
-  "TBODY",
-  "TD",
-  "TFOOT",
-  "TH",
-  "THEAD",
-  "TR",
-  "UL",
-]);
-
-export function isDisplayBlockTag(tagName: string): boolean {
-  return DISPLAY_BLOCK_TAGS.has(tagName.toUpperCase());
-}
+export { isDisplayBlockTag };
 
 export function formatDisplayTextTokens(tokens: DisplayTextToken[]): string {
   let result = "";

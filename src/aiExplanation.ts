@@ -8,6 +8,9 @@ import type {
 
 const REQUEST_TIMEOUT_MS = 30_000;
 
+export const AI_CONCEPT_LIMIT = { "zh-CN": 20, en: 8 } as const;
+export const AI_EXPLANATION_LIMIT = { "zh-CN": 100, en: 50 } as const;
+
 export interface AiExplanationDependencies {
   fetch: typeof fetch;
   getSyncStatus: () => Promise<SyncStatus>;
@@ -120,9 +123,13 @@ export function parseAiExplanation(
   const parsed = parseJsonOutput(value);
 
   return {
-    concept: requireLimitedText(parsed.concept, locale, 20, 8),
-    summary: requireLimitedText(parsed.summary, locale, 60, 30),
-    contextualMeaning: requireLimitedText(parsed.contextualMeaning, locale, 120, 60),
+    concept: requireLimitedText(parsed.concept, locale, AI_CONCEPT_LIMIT["zh-CN"], AI_CONCEPT_LIMIT.en),
+    explanation: requireLimitedText(
+      parsed.explanation,
+      locale,
+      AI_EXPLANATION_LIMIT["zh-CN"],
+      AI_EXPLANATION_LIMIT.en,
+    ),
   };
 }
 
@@ -137,13 +144,13 @@ export function parseAiExample(
 function buildInstructions(locale: AiExplainRequest["locale"]): string {
   const language = locale === "zh-CN" ? "简体中文" : "English";
   const limits = locale === "zh-CN"
-    ? "concept <= 20 Chinese characters, summary <= 60 Chinese characters, contextualMeaning <= 120 Chinese characters"
-    : "concept <= 8 words, summary <= 30 words, contextualMeaning <= 60 words";
+    ? `concept <= ${AI_CONCEPT_LIMIT["zh-CN"]} Chinese characters, explanation <= ${AI_EXPLANATION_LIMIT["zh-CN"]} Chinese characters`
+    : `concept <= ${AI_CONCEPT_LIMIT.en} words, explanation <= ${AI_EXPLANATION_LIMIT.en} words`;
   return [
     `Explain the selected concept in ${language}.`,
     "Return JSON only, with exactly these string fields:",
-    '{"concept":"...","summary":"...","contextualMeaning":"..."}',
-    `Be accurate and concise (${limits}). Explain its meaning in the supplied context. Do not use Markdown fences.`,
+    '{"concept":"...","explanation":"..."}',
+    `Be accurate and concise (${limits}). In one coherent explanation of no more than two sentences, clarify what the concept is and then explain what it means in the supplied context. Avoid repeating the same idea. Light Markdown emphasis is allowed when useful, but do not use Markdown fences.`,
   ].join("\n");
 }
 
@@ -183,8 +190,12 @@ function buildInput(selectedText: string, contextText: string): string {
 
 function extractOutputText(value: unknown): string {
   if (!isRecord(value)) return "";
-  if (typeof value.output_text === "string") return value.output_text;
-  if (!Array.isArray(value.output)) return "";
+  // An empty output_text is not the same as a missing one: OpenAI-compatible gateways commonly
+  // send `output_text: ""` alongside a complete `output` array, and returning early there threw
+  // away a perfectly good response (AI explanations, examples and "test connection" all failed).
+  const direct = typeof value.output_text === "string" ? value.output_text : "";
+  if (direct) return direct;
+  if (!Array.isArray(value.output)) return direct;
   return value.output.flatMap((item) => {
     if (!isRecord(item) || !Array.isArray(item.content)) return [];
     return item.content.flatMap((content) => (

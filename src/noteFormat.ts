@@ -1,68 +1,6 @@
-export type NoteBlock =
-  | { type: "paragraph"; lines: string[] }
-  | { type: "ordered-list"; start: number; items: string[] }
-  | { type: "unordered-list"; items: string[] };
-
 export interface NoteEdit {
   value: string;
   caret: number;
-}
-
-export function parseNoteBlocks(value: string): NoteBlock[] {
-  const blocks: NoteBlock[] = [];
-  let current: NoteBlock | null = null;
-
-  const flush = (): void => {
-    if (current) {
-      blocks.push(current);
-      current = null;
-    }
-  };
-
-  for (const line of value.split(/\r?\n/)) {
-    if (!line.trim()) {
-      flush();
-      continue;
-    }
-
-    const ordered = line.match(/^(\d+)\.\s+(.+)$/);
-    if (ordered) {
-      const item = ordered[2];
-      if (current?.type === "ordered-list") {
-        current.items.push(item);
-      } else {
-        flush();
-        current = {
-          type: "ordered-list",
-          start: Number.parseInt(ordered[1], 10),
-          items: [item],
-        };
-      }
-      continue;
-    }
-
-    const unordered = line.match(/^-\s+(.+)$/);
-    if (unordered) {
-      const item = unordered[1];
-      if (current?.type === "unordered-list") {
-        current.items.push(item);
-      } else {
-        flush();
-        current = { type: "unordered-list", items: [item] };
-      }
-      continue;
-    }
-
-    if (current?.type === "paragraph") {
-      current.lines.push(line);
-    } else {
-      flush();
-      current = { type: "paragraph", lines: [line] };
-    }
-  }
-
-  flush();
-  return blocks;
 }
 
 export function continueNoteList(

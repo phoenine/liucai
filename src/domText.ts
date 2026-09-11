@@ -1,7 +1,7 @@
 import type { HighlightSelector } from "./types";
 
 const IGNORED_TAGS = new Set(["SCRIPT", "STYLE", "NOSCRIPT", "TEXTAREA", "INPUT", "SELECT", "OPTION"]);
-const LIUCAI_UI_SELECTOR = [
+export const LIUCAI_UI_SELECTOR = [
   ".liucai-toolbar",
   ".liucai-popover",
   ".liucai-sidebar-root",

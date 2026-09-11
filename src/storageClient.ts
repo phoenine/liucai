@@ -37,14 +37,3 @@ export function addHighlight(record: HighlightRecord): Promise<void> {
 export function putHighlight(record: HighlightRecord): Promise<void> {
   return sendStorageRequest({ type: "LIUCAI_STORAGE_PUT_HIGHLIGHT", record });
 }
-
-export function importLegacyRecords(
-  pages: PageRecord[],
-  highlights: HighlightRecord[],
-): Promise<void> {
-  return sendStorageRequest({
-    type: "LIUCAI_STORAGE_IMPORT_LEGACY",
-    pages,
-    highlights,
-  });
-}

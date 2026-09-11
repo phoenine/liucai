@@ -5,12 +5,13 @@ import {
   generateExample,
   parseAiExplanation,
   testAiConnection,
+  AI_CONCEPT_LIMIT,
+  AI_EXPLANATION_LIMIT,
 } from "../src/aiExplanation.ts";
 
 const explanation = {
   concept: "RAG",
-  summary: "A model consults external knowledge.",
-  contextualMeaning: "It grounds the answer in the article's documents.",
+  explanation: "A model consults **external knowledge** to ground its answer in the article's documents.",
 };
 
 test("parses Responses API output_text and nested output content", () => {
@@ -19,6 +20,14 @@ test("parses Responses API output_text and nested output content", () => {
     output: [{ content: [{ type: "output_text", text: `\`\`\`json\n${JSON.stringify(explanation)}\n\`\`\`` }] }],
   }), explanation);
   assert.throws(() => parseAiExplanation({ output_text: "not json" }), /AI_INVALID_RESPONSE/);
+});
+
+test("keeps reading the output array when output_text is an empty string", () => {
+  // OpenAI-compatible gateways often send both fields, with output_text empty.
+  assert.deepEqual(parseAiExplanation({
+    output_text: "",
+    output: [{ content: [{ type: "output_text", text: JSON.stringify(explanation) }] }],
+  }), explanation);
 });
 
 test("calls the configured LM Studio Responses endpoint without inventing an auth header", async () => {
@@ -175,13 +184,11 @@ test("hard-limits light explanation length after model output", () => {
   const result = parseAiExplanation({
     output_text: JSON.stringify({
       concept: "一二三四五六七八九十一二三四五六七八九十一二三",
-      summary: "说".repeat(80),
-      contextualMeaning: "文".repeat(150),
+      explanation: "文".repeat(150),
     }),
   }, "zh-CN");
-  assert.equal(result.concept.length, 20);
-  assert.equal(result.summary.length, 60);
-  assert.equal(result.contextualMeaning.length, 120);
+  assert.equal(result.concept.length, AI_CONCEPT_LIMIT["zh-CN"]);
+  assert.equal(result.explanation.length, AI_EXPLANATION_LIMIT["zh-CN"]);
 });
 
 test("connection test requires a real model response even when an unsupported endpoint returns 200", async () => {

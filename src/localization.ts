@@ -123,8 +123,6 @@ export interface ContentCopy {
   save: string;
   aiLoading: string;
   aiTitle: string;
-  aiSummaryLabel: string;
-  aiContextLabel: string;
   aiExample: string;
   aiHideExample: string;
   aiExampleLoading: string;
@@ -371,8 +369,6 @@ const CONTENT_COPY: Record<ResolvedLocale, ContentCopy> = {
     save: "保存",
     aiLoading: "正在理解这段内容…",
     aiTitle: "AI 轻解释",
-    aiSummaryLabel: "一句话解释",
-    aiContextLabel: "在这里的意思",
     aiExample: "举个栗子🌰",
     aiHideExample: "收起例子",
     aiExampleLoading: "正在想栗子…",
@@ -427,8 +423,6 @@ const CONTENT_COPY: Record<ResolvedLocale, ContentCopy> = {
     save: "Save",
     aiLoading: "Understanding this selection…",
     aiTitle: "Quick AI explanation",
-    aiSummaryLabel: "In one sentence",
-    aiContextLabel: "Meaning in context",
     aiExample: "Give me an example 🌰",
     aiHideExample: "Hide example",
     aiExampleLoading: "Thinking of an example…",

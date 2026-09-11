@@ -278,16 +278,13 @@ select {
 }
 
 .lc-options__color-swatch {
+  background: var(--liucai-accent);
   border: 1px solid rgba(15, 23, 42, 0.08);
   border-radius: 999px;
   display: block;
   height: 26px;
   width: 26px;
 }
-
-.lc-options__color-swatch[data-color="gold"] { background: #ffea70; }
-.lc-options__color-swatch[data-color="mint"] { background: #4df4c9; }
-.lc-options__color-swatch[data-color="coral"] { background: #ffafa1; }
 
 .lc-options__color-copy,
 .lc-options__language-copy {

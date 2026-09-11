@@ -14,6 +14,8 @@ import { getSupabaseClient } from "./supabaseClient";
 import { parseSyncBatchResult, toRemoteMutations } from "./syncProtocol";
 
 const ALARM_NAME = "liucai-sync";
+/** Passed to `getOutboxBatch` as `now` to make it disregard every recorded backoff. */
+const IGNORE_BACKOFF = new Date(8640000000000000);
 let activeSync: Promise<void> | null = null;
 
 export function initializeSync(): void {
@@ -96,7 +98,7 @@ async function runSync(force: boolean): Promise<void> {
   let lastBatchIds: string[] = [];
   try {
     for (let round = 0; round < 20; round += 1) {
-      const batch = await getOutboxBatch(100, force ? new Date(8640000000000000) : new Date());
+      const batch = await getOutboxBatch(100, force ? IGNORE_BACKOFF : new Date());
       lastBatchIds = batch.map((mutation) => mutation.mutationId);
       const cursor = await getSyncCursor(user.id);
       const { data: response, error } = await client.rpc("apply_sync_batch", {

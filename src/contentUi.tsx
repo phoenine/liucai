@@ -12,20 +12,22 @@ import {
 import { type ReactNode, useEffect, useState } from "react";
 import type { ContentCopy } from "./localization";
 import type { AiExplanation } from "./messages";
-import { continueNoteList, parseNoteBlocks } from "./noteFormat";
+import { continueNoteList } from "./noteFormat";
+import { SafeMarkdown } from "./safeMarkdown";
 import {
   nextDeleteState,
   runCopyAction,
   type CopyStatus,
   type DeleteState,
 } from "./sidebarActionState";
+import { HIGHLIGHT_ACCENT } from "./highlightTooltip";
 import { parseTags } from "./tags";
 import type { HighlightColor, HighlightRecord } from "./types";
 
 const COLORS: Array<{ color: HighlightColor; value: string }> = [
-  { color: "gold", value: "#FFEA70" },
-  { color: "mint", value: "#4DF4C9" },
-  { color: "coral", value: "#FFAFA1" },
+  { color: "gold", value: HIGHLIGHT_ACCENT.gold },
+  { color: "mint", value: HIGHLIGHT_ACCENT.mint },
+  { color: "coral", value: HIGHLIGHT_ACCENT.coral },
 ];
 
 export type EditorFocus = "note" | "tags";
@@ -154,16 +156,11 @@ export function AiExplanationCard(props: {
       {props.state.status === "success" ? (
         <>
           <h3>{props.state.explanation.concept}</h3>
-          <div className="liucai-ai-card__section">
-            <span>{props.copy.aiSummaryLabel}</span>
-            <p>{props.state.explanation.summary}</p>
-          </div>
-          <div className="liucai-ai-card__section">
-            <span>{props.copy.aiContextLabel}</span>
-            <p>{props.state.explanation.contextualMeaning}</p>
+          <div className="liucai-ai-card__explanation">
+            <SafeMarkdown>{props.state.explanation.explanation}</SafeMarkdown>
           </div>
           {exampleOpen ? (
-            <div className="liucai-ai-card__example">{example}</div>
+            <div className="liucai-ai-card__example"><SafeMarkdown>{example}</SafeMarkdown></div>
           ) : null}
           {!props.canAppend ? (
             <p className="liucai-ai-card__hint is-warning">{props.copy.aiAppendUnavailable}</p>
@@ -419,7 +416,7 @@ function HighlightSidebarItem(props: {
         </button>
         {props.record.note.trim() ? (
           <div className="liucai-sidebar-item__note">
-            <FormattedNote value={props.record.note.trim()} />
+            <SafeMarkdown>{props.record.note.trim()}</SafeMarkdown>
           </div>
         ) : null}
         {tags.length > 0 ? (
@@ -474,7 +471,7 @@ export function HighlightTooltip(props: { note: string; tags: string[] }) {
     <>
       {props.note.trim() ? (
         <div className="liucai-highlight-tooltip__note">
-          <FormattedNote value={props.note.trim()} />
+          <SafeMarkdown>{props.note.trim()}</SafeMarkdown>
         </div>
       ) : null}
       {props.tags.length > 0 ? (
@@ -482,30 +479,6 @@ export function HighlightTooltip(props: { note: string; tags: string[] }) {
           {props.tags.map((tag, index) => <span key={`${tag}-${index}`}>#{tag}</span>)}
         </div>
       ) : null}
-    </>
-  );
-}
-
-export function FormattedNote(props: { value: string }) {
-  return (
-    <>
-      {parseNoteBlocks(props.value).map((block, index) => {
-        if (block.type === "paragraph") {
-          return <p className="liucai-note-paragraph" key={index}>{block.lines.join("\n")}</p>;
-        }
-        if (block.type === "ordered-list") {
-          return (
-            <ol className="liucai-note-list liucai-note-list--ordered" key={index} start={block.start}>
-              {block.items.map((item, itemIndex) => <li key={itemIndex}>{item}</li>)}
-            </ol>
-          );
-        }
-        return (
-          <ul className="liucai-note-list liucai-note-list--unordered" key={index}>
-            {block.items.map((item, itemIndex) => <li key={itemIndex}>{item}</li>)}
-          </ul>
-        );
-      })}
     </>
   );
 }
