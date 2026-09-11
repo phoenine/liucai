@@ -313,6 +313,47 @@ test("fills in a missing note so consumers can trim it", async () => {
   assert.deepEqual(loaded?.tags, []);
 });
 
+test("keeps local page timestamps when applying a remote change", async () => {
+  const page = await storage.upsertPage(
+    "https://example.com/keep",
+    "https://example.com/keep",
+    "Keep",
+  );
+  const local = await storage.db.pages.get(page.id);
+  // Clear the outbox so the incoming change is not skipped as a pending local edit.
+  await storage.db.outbox.clear();
+  const remote = "2026-09-11T00:00:00+00:00";
+
+  await storage.applySyncBatch("user-a", {
+    acknowledgedMutationIds: [],
+    changes: [{
+      sequence: 1,
+      entityType: "page",
+      entityId: page.id,
+      operation: "upsert",
+      revision: 1,
+      payload: {
+        ...page,
+        title: "Renamed",
+        createdAt: remote,
+        updatedAt: remote,
+        lastOpenedAt: remote,
+      },
+    }],
+    nextCursor: 1,
+    hasMore: false,
+  });
+
+  const after = await storage.db.pages.get(page.id);
+
+  assert.equal(after?.title, "Renamed");
+  // The server has no column for these two, so its echoes of updatedAt must not overwrite them.
+  assert.equal(after?.lastOpenedAt, local?.lastOpenedAt);
+  assert.equal(after?.createdAt, local?.createdAt);
+  // And timestamps are normalised, so ordering by string keeps working.
+  assert.match(String(after?.updatedAt), /^\d{4}-\d{2}-\d{2}T[\d:.]+Z$/);
+});
+
 function createHighlight(pageId: string): HighlightRecord {
   return {
     id: "highlight-1",

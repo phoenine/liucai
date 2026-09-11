@@ -158,6 +158,9 @@ export class ContentController {
     document.addEventListener("click", this.handleDocumentClickEvent, true);
     document.addEventListener("pointerover", this.handleHighlightPointerOver, true);
     document.addEventListener("pointerout", this.handleHighlightPointerOut, true);
+    // Capture phase, so scrolling inside a nested container counts too.
+    document.addEventListener("scroll", this.handleViewportChange, true);
+    window.addEventListener("resize", this.handleViewportChange);
     window.addEventListener("blur", this.clearUiMouseDown);
     this.pageActive = true;
 
@@ -178,6 +181,8 @@ export class ContentController {
     document.removeEventListener("click", this.handleDocumentClickEvent, true);
     document.removeEventListener("pointerover", this.handleHighlightPointerOver, true);
     document.removeEventListener("pointerout", this.handleHighlightPointerOut, true);
+    document.removeEventListener("scroll", this.handleViewportChange, true);
+    window.removeEventListener("resize", this.handleViewportChange);
     window.removeEventListener("blur", this.clearUiMouseDown);
     this.pageActive = false;
     this.sidebarOpen = false;
@@ -280,6 +285,8 @@ export class ContentController {
 
   private async refreshSyncedPage(): Promise<void> {
     if (!this.pageActive || this.disposed) return;
+    // The spans are rebuilt below, which would leave a visible tooltip anchored to a removed node.
+    this.mounts.hideHighlightTooltip();
     if (this.mounts.hasPopover()) {
       await this.restoreHighlights();
       await this.refreshSidebarData();
@@ -297,6 +304,7 @@ export class ContentController {
   private handleKeyDown = (event: KeyboardEvent): void => {
     if (event.key === "Escape") {
       this.aiRequestId += 1;
+      this.cancelAiRequest();
       this.mounts.hideToolbar();
       this.mounts.hidePopover();
     }
@@ -430,6 +438,23 @@ export class ContentController {
     this.mounts.hideHighlightTooltip();
   };
 
+  /**
+   * A fixed-position tooltip does not follow its anchor when the page scrolls or the window resizes,
+   * and the browser delivers no pointerout for either. Hide it rather than leave it floating over
+   * unrelated content until the pointer happens to move.
+   */
+  private handleViewportChange = (): void => {
+    this.mounts.hideHighlightTooltip();
+  };
+
+  /**
+   * Closing the AI card only made the content script ignore the answer; the model kept generating
+   * until it finished or the timeout fired.
+   */
+  private cancelAiRequest(): void {
+    void chrome.runtime.sendMessage({ type: "LIUCAI_AI_CANCEL" }).catch(() => undefined);
+  }
+
   private async handleDocumentClick(event: MouseEvent): Promise<void> {
     const target = event.target as Element | null;
     if (this.isLiucaiUiTarget(target)) {
@@ -442,6 +467,7 @@ export class ContentController {
     }
 
     this.aiRequestId += 1;
+    this.cancelAiRequest();
     // Clicking the page while the note editor holds unsaved edits used to unmount it and throw the
     // text away with no warning. Leave it open — "cancel" and "save" are the explicit ways out.
     if (!this.editorDirty) {
@@ -583,6 +609,7 @@ export class ContentController {
           onRetry={() => request()}
           onClose={() => {
             this.aiRequestId += 1;
+            this.cancelAiRequest();
             this.mounts.hidePopover();
           }}
         />,

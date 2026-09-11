@@ -277,8 +277,11 @@ export async function recordSyncStateError(userId: string, message: string): Pro
 }
 
 async function applyRemotePage(payload: PageRecord): Promise<void> {
-  const page = pickPageFields(payload);
-  const canonicalMatch = await db.pages.where("canonicalUrl").equals(page.canonicalUrl).first();
+  const existing = await db.pages.get(payload.id);
+  const canonicalMatch = await db.pages.where("canonicalUrl").equals(payload.canonicalUrl).first();
+  const local = existing
+    ?? (canonicalMatch && canonicalMatch.id !== payload.id ? canonicalMatch : undefined);
+  const page = pickPageFields(payload, local);
   if (canonicalMatch && canonicalMatch.id !== page.id) {
     await db.highlights.where("pageId").equals(canonicalMatch.id).modify({ pageId: page.id });
     await db.pages.delete(canonicalMatch.id);
@@ -302,16 +305,27 @@ async function applyRemoteHighlightDelete(
   }));
 }
 
-function pickPageFields(payload: PageRecord): PageRecord {
+/**
+ * `createdAt` and `lastOpenedAt` are local facts: the server has no column for either, so the
+ * payload's copies are echoes of `updatedAt`. Writing those over the real values lost "recently
+ * opened" ordering and mixed `+00:00` in with the local `Z` format, which breaks text comparisons.
+ */
+function pickPageFields(payload: PageRecord, local?: PageRecord): PageRecord {
   return {
     id: payload.id,
     canonicalUrl: payload.canonicalUrl,
     originalUrl: payload.originalUrl,
     title: payload.title,
-    createdAt: payload.createdAt,
-    updatedAt: payload.updatedAt,
-    lastOpenedAt: payload.lastOpenedAt ?? payload.updatedAt,
+    createdAt: local?.createdAt ?? normalizeTimestamp(payload.createdAt),
+    updatedAt: normalizeTimestamp(payload.updatedAt),
+    lastOpenedAt: local?.lastOpenedAt ?? normalizeTimestamp(payload.lastOpenedAt ?? payload.updatedAt),
   };
+}
+
+/** One timestamp format everywhere, so ordering by string stays correct. */
+function normalizeTimestamp(value: string): string {
+  const parsed = Date.parse(value);
+  return Number.isNaN(parsed) ? value : new Date(parsed).toISOString();
 }
 
 function pickHighlightFields(payload: HighlightRecord): HighlightRecord {

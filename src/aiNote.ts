@@ -20,7 +20,14 @@ export function formatAiExplanationNote(
   ].join("\n");
 }
 
+/**
+ * Notes are otherwise unbounded: every append lands in IndexedDB, in the sync payload and in the
+ * Obsidian export, and a single append can already add a few thousand characters.
+ */
+export const MAX_NOTE_LENGTH = 200_000;
+
 export function appendNote(existing: string, addition: string): string {
   const current = existing.trim();
-  return current ? `${current}\n\n${addition.trim()}` : addition.trim();
+  const next = current ? `${current}\n\n${addition.trim()}` : addition.trim();
+  return next.length > MAX_NOTE_LENGTH ? next.slice(0, MAX_NOTE_LENGTH) : next;
 }

@@ -476,6 +476,8 @@
 
 .liucai-highlight-tooltip {
   all: initial;
+  max-height: calc(100vh - 16px);
+  overflow-y: auto;
   box-sizing: border-box;
   position: fixed;
   z-index: 2147483647;

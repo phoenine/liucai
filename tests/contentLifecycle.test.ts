@@ -67,3 +67,14 @@ test("activates the page before the storage round trips", async () => {
   assert.ok(restore !== -1, "restore call is present");
   assert.ok(listeners < restore, "listeners register before the restore call");
 });
+
+test("drops the tooltip when the viewport moves and aborts model work on close", async () => {
+  const source = await controllerSource();
+
+  // A fixed-position tooltip does not follow its anchor on scroll or resize, and no pointerout comes.
+  assert.match(source, /document\.addEventListener\("scroll", this\.handleViewportChange, true\)/);
+  assert.match(source, /document\.removeEventListener\("scroll", this\.handleViewportChange, true\)/);
+  assert.match(source, /window\.addEventListener\("resize", this\.handleViewportChange\)/);
+  // Closing the AI card has to abort the background request, not just ignore its answer.
+  assert.match(source, /type: "LIUCAI_AI_CANCEL"/);
+});

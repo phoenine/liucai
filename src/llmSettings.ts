@@ -128,10 +128,22 @@ function normalizeString(value: unknown): string {
 function isHttpUrl(value: string): boolean {
   try {
     const url = new URL(value);
-    return url.protocol === "http:" || url.protocol === "https:";
+    // Credentials embedded in the URL would leak into logs and error messages.
+    if (url.username || url.password) return false;
+    if (url.protocol === "https:") return true;
+    // Plain http is only acceptable for a model running on this machine; anywhere else it would send
+    // the API key over the network in clear text.
+    return url.protocol === "http:" && isLocalHostname(url.hostname);
   } catch {
     return false;
   }
+}
+
+function isLocalHostname(hostname: string): boolean {
+  return hostname === "localhost"
+    || hostname === "127.0.0.1"
+    || hostname === "::1"
+    || hostname === "[::1]";
 }
 
 function isLlmProvider(value: unknown): value is LlmProvider {

@@ -7,6 +7,7 @@ import {
 } from "./db";
 import {
   AI_AUTH_STATE_STORAGE_KEY,
+  isAiCancelRequest,
   isAiExampleRequest,
   isAiExplainRequest,
   isAiTestConnectionRequest,
@@ -14,6 +15,7 @@ import {
   isSyncRequest,
   type StorageRequest,
   type StorageResponse,
+  type AiCancelRequest,
   type AiExplainRequest,
   type AiExampleRequest,
   type AiTestConnectionRequest,
@@ -35,6 +37,15 @@ chrome.runtime.onInstalled.addListener(() => {
 
 initializeSync();
 
+/** The in-flight model request, so the content script can abort it when the AI card is closed. */
+let activeAiAbort: AbortController | null = null;
+
+// IndexedDB is best-effort: under storage pressure the browser may evict it, taking every saved
+// highlight with it. Ask for a persistent grant, backed by the `unlimitedStorage` permission.
+if (navigator.storage?.persist) {
+  void navigator.storage.persist().catch(() => undefined);
+}
+
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (
     sender.id !== chrome.runtime.id
@@ -44,6 +55,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       && !isAiExplainRequest(message)
       && !isAiExampleRequest(message)
       && !isAiTestConnectionRequest(message)
+      && !isAiCancelRequest(message)
     )
   ) {
     return undefined;
@@ -59,17 +71,28 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 });
 
 async function handleRequest(
-  request: StorageRequest | SyncRequest | AiExplainRequest | AiExampleRequest | AiTestConnectionRequest,
+  request: StorageRequest | SyncRequest | AiExplainRequest | AiExampleRequest | AiTestConnectionRequest | AiCancelRequest,
 ): Promise<unknown> {
+  if (isAiCancelRequest(request)) {
+    activeAiAbort?.abort();
+    activeAiAbort = null;
+    return { cancelled: true };
+  }
   if (isAiTestConnectionRequest(request)) {
     await testAiConnection(request.connection);
     return { connected: true };
   }
-  if (isAiExampleRequest(request)) {
-    return generateExample(request, getAiDependencies());
-  }
-  if (isAiExplainRequest(request)) {
-    return explainSelection(request, getAiDependencies());
+  if (isAiExampleRequest(request) || isAiExplainRequest(request)) {
+    // Only one model request is ever on screen, so a new one replaces the previous.
+    const abort = new AbortController();
+    activeAiAbort = abort;
+    try {
+      return isAiExampleRequest(request)
+        ? await generateExample(request, getAiDependencies(), abort.signal)
+        : await explainSelection(request, getAiDependencies(), abort.signal);
+    } finally {
+      if (activeAiAbort === abort) activeAiAbort = null;
+    }
   }
   if (isSyncRequest(request)) {
     const status = await handleSyncRequest(request);

@@ -55,6 +55,10 @@ export interface AiTestConnectionRequest {
   };
 }
 
+export interface AiCancelRequest {
+  type: "LIUCAI_AI_CANCEL";
+}
+
 export interface PageStatus {
   ok: true;
   canonicalUrl: string;
@@ -159,6 +163,12 @@ export function isAiExampleRequest(message: unknown): message is AiExampleReques
     && request.concept.trim().length > 0
     && request.concept.length <= 120
     && (request.locale === "zh-CN" || request.locale === "en");
+}
+
+export function isAiCancelRequest(message: unknown): message is AiCancelRequest {
+  return typeof message === "object"
+    && message !== null
+    && (message as AiCancelRequest).type === "LIUCAI_AI_CANCEL";
 }
 
 export function isAiTestConnectionRequest(message: unknown): message is AiTestConnectionRequest {

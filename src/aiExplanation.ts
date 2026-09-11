@@ -23,9 +23,14 @@ export interface AiModelConnection {
   apiKey: string;
 }
 
+/**
+ * `signal` lets the caller drop a request it no longer cares about: closing the AI card should not
+ * leave a local model generating for the rest of the timeout.
+ */
 export async function explainSelection(
   request: AiExplainRequest,
   dependencies: AiExplanationDependencies,
+  signal?: AbortSignal,
 ): Promise<AiExplanation> {
   const status = await dependencies.getSyncStatus();
   if (!status.signedIn) throw new Error("AI_SIGN_IN_REQUIRED");
@@ -35,6 +40,8 @@ export async function explainSelection(
 
   const controller = new AbortController();
   const timeout = globalThis.setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  const abortFromCaller = (): void => controller.abort();
+  signal?.addEventListener("abort", abortFromCaller, { once: true });
   try {
     const response = await sendResponseRequest(dependencies, connection, controller.signal, {
       instructions: buildInstructions(request.locale),
@@ -44,16 +51,19 @@ export async function explainSelection(
     });
     return parseAiExplanation(await response.json(), request.locale);
   } catch (error) {
+    if (signal?.aborted) throw new Error("AI_REQUEST_CANCELLED");
     if (controller.signal.aborted) throw new Error("AI_REQUEST_TIMEOUT");
     throw error;
   } finally {
     globalThis.clearTimeout(timeout);
+    signal?.removeEventListener("abort", abortFromCaller);
   }
 }
 
 export async function generateExample(
   request: AiExampleRequest,
   dependencies: AiExplanationDependencies,
+  signal?: AbortSignal,
 ): Promise<AiExample> {
   const status = await dependencies.getSyncStatus();
   if (!status.signedIn) throw new Error("AI_SIGN_IN_REQUIRED");
@@ -62,6 +72,8 @@ export async function generateExample(
 
   const controller = new AbortController();
   const timeout = globalThis.setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  const abortFromCaller = (): void => controller.abort();
+  signal?.addEventListener("abort", abortFromCaller, { once: true });
   try {
     const language = request.locale === "zh-CN" ? "简体中文" : "English";
     const response = await sendResponseRequest(dependencies, connection, controller.signal, {
@@ -78,10 +90,12 @@ export async function generateExample(
     });
     return parseAiExample(await response.json(), request.locale);
   } catch (error) {
+    if (signal?.aborted) throw new Error("AI_REQUEST_CANCELLED");
     if (controller.signal.aborted) throw new Error("AI_REQUEST_TIMEOUT");
     throw error;
   } finally {
     globalThis.clearTimeout(timeout);
+    signal?.removeEventListener("abort", abortFromCaller);
   }
 }
 

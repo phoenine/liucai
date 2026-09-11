@@ -5,6 +5,20 @@ import type { HighlightColor } from "./types";
 
 type MountedRoot = { root: Root; node: HTMLElement } | null;
 
+/**
+ * Viewport size excluding classic scrollbars.
+ *
+ * `window.innerWidth` counts the scrollbar, so anything clamped against it can still land underneath
+ * one. `documentElement.clientWidth` is the space actually available to us.
+ */
+function viewportWidth(): number {
+  return document.documentElement.clientWidth;
+}
+
+function viewportHeight(): number {
+  return document.documentElement.clientHeight;
+}
+
 export class ContentMounts {
   private toolbar: MountedRoot = null;
   private popover: MountedRoot = null;
@@ -16,8 +30,8 @@ export class ContentMounts {
     this.hideToolbar();
     const node = document.createElement("div");
     node.className = `liucai-toolbar ${stateClass}`;
-    node.style.left = `${Math.min(Math.max(8, centerX - width / 2), window.innerWidth - width - 8)}px`;
-    node.style.top = `${Math.min(Math.max(8, top), window.innerHeight - 58)}px`;
+    node.style.left = `${Math.min(Math.max(8, centerX - width / 2), viewportWidth() - width - 8)}px`;
+    node.style.top = `${Math.min(Math.max(8, top), viewportHeight() - 58)}px`;
     document.body.append(node);
     this.toolbar = this.renderInto(node, children);
   }
@@ -31,8 +45,8 @@ export class ContentMounts {
     this.hidePopover();
     const node = document.createElement("div");
     node.className = `liucai-popover ${stateClass}`;
-    node.style.left = `${Math.min(Math.max(8, left), Math.max(8, window.innerWidth - 336))}px`;
-    node.style.top = `${Math.min(Math.max(8, top), Math.max(8, window.innerHeight - 328))}px`;
+    node.style.left = `${Math.min(Math.max(8, left), Math.max(8, viewportWidth() - 336))}px`;
+    node.style.top = `${Math.min(Math.max(8, top), Math.max(8, viewportHeight() - 328))}px`;
     node.style.visibility = "hidden";
     document.body.append(node);
     this.popover = this.renderInto(node, children);
@@ -43,8 +57,8 @@ export class ContentMounts {
     window.requestAnimationFrame(() => {
       const margin = 8;
       const rect = node.getBoundingClientRect();
-      const nextLeft = Math.min(Math.max(margin, rect.left), Math.max(margin, window.innerWidth - rect.width - margin));
-      const nextTop = Math.min(Math.max(margin, rect.top), Math.max(margin, window.innerHeight - rect.height - margin));
+      const nextLeft = Math.min(Math.max(margin, rect.left), Math.max(margin, viewportWidth() - rect.width - margin));
+      const nextTop = Math.min(Math.max(margin, rect.top), Math.max(margin, viewportHeight() - rect.height - margin));
       node.style.left = `${nextLeft}px`;
       node.style.top = `${nextTop}px`;
       node.style.visibility = "visible";
@@ -98,7 +112,7 @@ export class ContentMounts {
       const position = placeTooltip(
         anchorRect,
         node.getBoundingClientRect(),
-        { width: window.innerWidth, height: window.innerHeight },
+        { width: viewportWidth(), height: viewportHeight() },
       );
       node.dataset.placement = position.placement;
       node.style.left = `${position.left}px`;
