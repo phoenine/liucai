@@ -98,6 +98,7 @@ export class ContentController {
   private locationTimer: number | null = null;
   private selectionRequestId = 0;
   private aiRequestId = 0;
+  private activeAiModelRequestId: string | null = null;
   private mouseDownStartedInUi = false;
   private ignorePageClickUntilMouseDown = false;
   private editorDirty = false;
@@ -190,6 +191,7 @@ export class ContentController {
     this.mouseDownStartedInUi = false;
     this.ignorePageClickUntilMouseDown = false;
     this.aiRequestId += 1;
+    this.cancelAiRequest();
     this.hoverRequests.clear();
     this.mounts.hideAll();
     for (const span of Array.from(document.querySelectorAll<HTMLElement>(".liucai-highlight"))) {
@@ -258,7 +260,7 @@ export class ContentController {
       if (languageChanged && this.pageActive) {
         this.aiRequestId += 1;
         this.mounts.hideToolbar();
-        this.mounts.hidePopover();
+        if (!this.editorDirty) this.mounts.hidePopover();
         void this.transitions
           .run(() => this.refreshSidebarData())
           .catch((error) => this.reportError("language preference sync", error));
@@ -271,7 +273,7 @@ export class ContentController {
       this.aiRequestId += 1;
       this.currentSelectionRange = null;
       this.mounts.hideToolbar();
-      this.mounts.hidePopover();
+      if (!this.editorDirty) this.mounts.hidePopover();
       if (Object.keys(changes).length === 1) return;
     }
 
@@ -303,6 +305,7 @@ export class ContentController {
 
   private handleKeyDown = (event: KeyboardEvent): void => {
     if (event.key === "Escape") {
+      if (this.editorDirty) return;
       this.aiRequestId += 1;
       this.cancelAiRequest();
       this.mounts.hideToolbar();
@@ -344,6 +347,9 @@ export class ContentController {
       return;
     }
     this.mouseDownStartedInUi = false;
+
+    // Unsaved editor content must only be discarded by its explicit Cancel action.
+    if (this.editorDirty) return;
 
     const requestId = ++this.selectionRequestId;
     const selection = window.getSelection();
@@ -427,6 +433,15 @@ export class ContentController {
   };
 
   private handleHighlightPointerOut = (event: PointerEvent): void => {
+    const related = event.relatedTarget instanceof Element ? event.relatedTarget : null;
+    if (related?.closest(".liucai-highlight-tooltip")) return;
+
+    const tooltip = (event.target as Element | null)?.closest?.(".liucai-highlight-tooltip");
+    if (tooltip) {
+      if (!related?.closest(".liucai-highlight-tooltip")) this.mounts.hideHighlightTooltip();
+      return;
+    }
+
     const highlight = this.getTooltipHighlight(event.target);
     if (!highlight || this.isInsideHighlight(highlight, event.relatedTarget)) {
       return;
@@ -443,7 +458,10 @@ export class ContentController {
    * and the browser delivers no pointerout for either. Hide it rather than leave it floating over
    * unrelated content until the pointer happens to move.
    */
-  private handleViewportChange = (): void => {
+  private handleViewportChange = (event: Event): void => {
+    if (event.target instanceof Element && event.target.closest(".liucai-highlight-tooltip")) {
+      return;
+    }
     this.mounts.hideHighlightTooltip();
   };
 
@@ -452,7 +470,10 @@ export class ContentController {
    * until it finished or the timeout fired.
    */
   private cancelAiRequest(): void {
-    void chrome.runtime.sendMessage({ type: "LIUCAI_AI_CANCEL" }).catch(() => undefined);
+    const requestId = this.activeAiModelRequestId;
+    if (!requestId) return;
+    this.activeAiModelRequestId = null;
+    void chrome.runtime.sendMessage({ type: "LIUCAI_AI_CANCEL", requestId }).catch(() => undefined);
   }
 
   private async handleDocumentClick(event: MouseEvent): Promise<void> {
@@ -460,6 +481,7 @@ export class ContentController {
     if (this.isLiucaiUiTarget(target)) {
       return;
     }
+    if (this.editorDirty) return;
 
     const selection = window.getSelection();
     if (selection && !selection.isCollapsed && selection.toString().trim()) {
@@ -468,11 +490,8 @@ export class ContentController {
 
     this.aiRequestId += 1;
     this.cancelAiRequest();
-    // Clicking the page while the note editor holds unsaved edits used to unmount it and throw the
-    // text away with no warning. Leave it open — "cancel" and "save" are the explicit ways out.
-    if (!this.editorDirty) {
-      this.mounts.hidePopover();
-    }
+    // The dirty-editor guard above makes Cancel and Save the only ways to discard pending edits.
+    this.mounts.hidePopover();
 
     const highlightEl = target?.closest?.(".liucai-highlight") as HTMLElement | null;
     if (!highlightEl) return;
@@ -567,6 +586,7 @@ export class ContentController {
   }
 
   private handleAiSelection = (): void => {
+    if (this.editorDirty) return;
     const range = this.currentSelectionRange?.cloneRange();
     if (!range) return;
 
@@ -592,12 +612,17 @@ export class ContentController {
           createsHighlight={highlightIds.length === 0}
           onLoadExample={async () => {
             if (!explanation) throw new Error("AI_EXPLANATION_MISSING");
+            const modelRequestId = generateUuid();
+            this.activeAiModelRequestId = modelRequestId;
             const response = await chrome.runtime.sendMessage({
               type: "LIUCAI_AI_EXAMPLE",
+              requestId: modelRequestId,
               selectedText: selectedText.slice(0, 1500),
               contextText: contextText.slice(0, 2500),
               concept: explanation.concept,
               locale: this.interfaceLocale,
+            }).finally(() => {
+              if (this.activeAiModelRequestId === modelRequestId) this.activeAiModelRequestId = null;
             }) as StorageResponse<AiExample> | undefined;
             if (!response?.ok) throw new Error(response?.error ?? "AI_REQUEST_FAILED");
             return response.data.example;
@@ -620,8 +645,11 @@ export class ContentController {
 
     const request = (): void => {
       render({ status: "loading" });
+      const modelRequestId = generateUuid();
+      this.activeAiModelRequestId = modelRequestId;
       void chrome.runtime.sendMessage({
         type: "LIUCAI_AI_EXPLAIN",
+        requestId: modelRequestId,
         selectedText: selectedText.slice(0, 1500),
         contextText: contextText.slice(0, 2500),
         locale: this.interfaceLocale,
@@ -634,6 +662,8 @@ export class ContentController {
         render({ status: "success", explanation: response.data });
       }).catch((error) => {
         render({ status: "error", error: this.stringifyError(error) });
+      }).finally(() => {
+        if (this.activeAiModelRequestId === modelRequestId) this.activeAiModelRequestId = null;
       });
     };
 
@@ -776,7 +806,10 @@ export class ContentController {
         onDirtyChange={(dirty) => {
           this.editorDirty = dirty;
         }}
-        onCancel={() => this.mounts.hidePopover()}
+        onCancel={() => {
+          this.editorDirty = false;
+          this.mounts.hidePopover();
+        }}
         onSave={(id, note, tags) => this.saveHighlightMeta(id, note, tags)}
       />,
     );
@@ -950,6 +983,7 @@ export class ContentController {
     };
     await putHighlight(updated);
     updateHighlightAttributes(updated);
+    this.editorDirty = false;
     this.mounts.hidePopover();
     await this.refreshSidebarData();
   }

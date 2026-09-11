@@ -28,6 +28,7 @@ import {
   testAiConnection,
   type AiExplanationDependencies,
 } from "./aiExplanation";
+import { AiRequestRegistry } from "./aiRequestRegistry";
 import { getActiveLlmConnection, loadLlmSettings } from "./llmSettings";
 import { getSyncStatus, initializeSync, retrySync, signIn, signOut, signUp, triggerSync } from "./sync";
 
@@ -37,8 +38,8 @@ chrome.runtime.onInstalled.addListener(() => {
 
 initializeSync();
 
-/** The in-flight model request, so the content script can abort it when the AI card is closed. */
-let activeAiAbort: AbortController | null = null;
+/** At most one visible model request per tab/document, without cross-tab cancellation. */
+const aiRequests = new AiRequestRegistry();
 
 // IndexedDB is best-effort: under storage pressure the browser may evict it, taking every saved
 // highlight with it. Ask for a persistent grant, backed by the `unlimitedStorage` permission.
@@ -61,7 +62,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return undefined;
   }
 
-  void handleRequest(message)
+  void handleRequest(message, sender)
     .then((data) => sendResponse({ ok: true, data } satisfies StorageResponse<unknown>))
     .catch((error) => sendResponse({
       ok: false,
@@ -72,10 +73,11 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
 async function handleRequest(
   request: StorageRequest | SyncRequest | AiExplainRequest | AiExampleRequest | AiTestConnectionRequest | AiCancelRequest,
+  sender: chrome.runtime.MessageSender,
 ): Promise<unknown> {
   if (isAiCancelRequest(request)) {
-    activeAiAbort?.abort();
-    activeAiAbort = null;
+    const contextKey = aiContextKey(sender);
+    aiRequests.cancel(contextKey, request.requestId);
     return { cancelled: true };
   }
   if (isAiTestConnectionRequest(request)) {
@@ -83,15 +85,14 @@ async function handleRequest(
     return { connected: true };
   }
   if (isAiExampleRequest(request) || isAiExplainRequest(request)) {
-    // Only one model request is ever on screen, so a new one replaces the previous.
-    const abort = new AbortController();
-    activeAiAbort = abort;
+    const contextKey = aiContextKey(sender);
+    const abort = aiRequests.begin(contextKey, request.requestId);
     try {
       return isAiExampleRequest(request)
         ? await generateExample(request, getAiDependencies(), abort.signal)
         : await explainSelection(request, getAiDependencies(), abort.signal);
     } finally {
-      if (activeAiAbort === abort) activeAiAbort = null;
+      aiRequests.finish(contextKey, request.requestId, abort);
     }
   }
   if (isSyncRequest(request)) {
@@ -110,6 +111,11 @@ async function handleRequest(
   const result = await handleStorageRequest(request);
   if (isMutationRequest(request)) void triggerSync().catch(() => undefined);
   return result;
+}
+
+function aiContextKey(sender: chrome.runtime.MessageSender): string {
+  if (typeof sender.tab?.id === "number") return `tab:${sender.tab.id}`;
+  return `document:${sender.documentId ?? sender.url ?? "extension"}`;
 }
 
 function getAiDependencies(): AiExplanationDependencies {

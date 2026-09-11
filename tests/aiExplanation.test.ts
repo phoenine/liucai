@@ -30,6 +30,28 @@ test("keeps reading the output array when output_text is an empty string", () =>
   }), explanation);
 });
 
+test("falls back past whitespace output_text and invalid prose braces", () => {
+  assert.deepEqual(parseAiExplanation({
+    output_text: "   ",
+    output: [{ content: [{ text: JSON.stringify(explanation) }] }],
+  }), explanation);
+  assert.deepEqual(parseAiExplanation({
+    output_text: `A set looks like {a, b}. Result: ${JSON.stringify(explanation)}`,
+  }), explanation);
+});
+
+test("does not split a Unicode code point at the Chinese concept limit", () => {
+  const result = parseAiExplanation({
+    output_text: JSON.stringify({
+      concept: `${"字".repeat(AI_CONCEPT_LIMIT["zh-CN"] - 1)}😀尾`,
+      explanation: "说明",
+    }),
+  }, "zh-CN");
+
+  assert.equal(Array.from(result.concept).length, AI_CONCEPT_LIMIT["zh-CN"]);
+  assert.equal(result.concept.endsWith("😀"), true);
+});
+
 test("reads JSON that the model wrapped in prose", () => {
   const body = JSON.stringify(explanation);
 
@@ -50,6 +72,7 @@ test("calls the configured LM Studio Responses endpoint without inventing an aut
   let capturedInit: RequestInit | undefined;
   const result = await explainSelection({
     type: "LIUCAI_AI_EXPLAIN",
+    requestId: "request-1",
     selectedText: "RAG",
     contextText: "This system uses RAG for its answers.",
     locale: "en",
@@ -88,6 +111,7 @@ test("rejects signed-out and incomplete configurations before making a request",
   };
   await assert.rejects(() => explainSelection({
     type: "LIUCAI_AI_EXPLAIN",
+    requestId: "request-1",
     selectedText: "term",
     contextText: "context",
     locale: "zh-CN",
@@ -99,6 +123,7 @@ test("rejects signed-out and incomplete configurations before making a request",
 
   await assert.rejects(() => explainSelection({
     type: "LIUCAI_AI_EXPLAIN",
+    requestId: "request-2",
     selectedText: "term",
     contextText: "context",
     locale: "en",
@@ -113,6 +138,7 @@ test("sends a bearer token only when the selected provider has one", async () =>
   let authorization = "";
   await explainSelection({
     type: "LIUCAI_AI_EXPLAIN",
+    requestId: "request-1",
     selectedText: "term",
     contextText: "context",
     locale: "en",
@@ -135,6 +161,7 @@ test("generates examples as a separate low-reasoning request", async () => {
   let requestBody: { reasoning: { effort: string }; max_output_tokens: number } | undefined;
   const result = await generateExample({
     type: "LIUCAI_AI_EXAMPLE",
+    requestId: "request-1",
     selectedText: "RAG",
     contextText: "RAG is used here.",
     concept: "Retrieval augmented generation",
@@ -158,6 +185,7 @@ test("preserves formatting in generated code examples", async () => {
   const codeExample = "```ts\nconst result = await run();\nconsole.log(result);\n```";
   const result = await generateExample({
     type: "LIUCAI_AI_EXAMPLE",
+    requestId: "request-1",
     selectedText: "async/await",
     contextText: "Use async/await for asynchronous code.",
     concept: "async/await",
@@ -176,6 +204,7 @@ test("preserves formatting in generated code examples", async () => {
 test("rejects a reasoning-only example response with no final answer", async () => {
   await assert.rejects(() => generateExample({
     type: "LIUCAI_AI_EXAMPLE",
+    requestId: "request-1",
     selectedText: "提示词链",
     contextText: "提示词链可以调用外部工具。",
     concept: "提示词链",

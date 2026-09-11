@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   isAiExplainRequest,
+  isAiCancelRequest,
   isAiExampleRequest,
   isAiTestConnectionRequest,
   isPageStatusRequest,
@@ -13,18 +14,21 @@ import {
 test("validates bounded AI explanation requests", () => {
   assert.equal(isAiExplainRequest({
     type: "LIUCAI_AI_EXPLAIN",
+    requestId: "request-1",
     selectedText: "retrieval augmented generation",
     contextText: "A nearby paragraph",
     locale: "en",
   }), true);
   assert.equal(isAiExplainRequest({
     type: "LIUCAI_AI_EXPLAIN",
+    requestId: "request-1",
     selectedText: " ",
     contextText: "context",
     locale: "zh-CN",
   }), false);
   assert.equal(isAiExplainRequest({
     type: "LIUCAI_AI_EXPLAIN",
+    requestId: "request-1",
     selectedText: "term",
     contextText: "context",
     locale: "fr",
@@ -34,6 +38,7 @@ test("validates bounded AI explanation requests", () => {
 test("validates follow-up example requests", () => {
   assert.equal(isAiExampleRequest({
     type: "LIUCAI_AI_EXAMPLE",
+    requestId: "request-1",
     selectedText: "RAG",
     contextText: "RAG is used here.",
     concept: "Retrieval augmented generation",
@@ -41,11 +46,17 @@ test("validates follow-up example requests", () => {
   }), true);
   assert.equal(isAiExampleRequest({
     type: "LIUCAI_AI_EXAMPLE",
+    requestId: "request-1",
     selectedText: "RAG",
     contextText: "context",
     concept: "",
     locale: "en",
   }), false);
+});
+
+test("requires an exact AI request id for cancellation", () => {
+  assert.equal(isAiCancelRequest({ type: "LIUCAI_AI_CANCEL", requestId: "request-1" }), true);
+  assert.equal(isAiCancelRequest({ type: "LIUCAI_AI_CANCEL" }), false);
 });
 
 test("validates bounded AI connection tests", () => {

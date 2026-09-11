@@ -15,11 +15,9 @@ test("formats localized AI notes and preserves an existing note", () => {
   assert.equal(appendNote("", block), block);
 });
 
-test("caps appending so a note cannot grow without bound", () => {
-  const chunk = "字".repeat(150_000);
-  const once = appendNote(chunk, chunk);
-  const twice = appendNote(once, chunk);
+test("rejects an append that would exceed the note limit without truncating it", () => {
+  const existing = "字".repeat(MAX_NOTE_LENGTH - 3);
 
-  assert.equal(once.length, MAX_NOTE_LENGTH);
-  assert.equal(twice.length, MAX_NOTE_LENGTH);
+  assert.throws(() => appendNote(existing, "新增内容"), /NOTE_TOO_LONG/);
+  assert.equal(appendNote("原文", "新增"), "原文\n\n新增");
 });

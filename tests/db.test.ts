@@ -261,18 +261,29 @@ test("ignores the recorded backoff when handed a far-future now", async () => {
   assert.equal((await storage.getOutboxBatch(100, new Date(8640000000000000))).length, 1);
 });
 
-test("clamps queued payloads to the server-side limits", async () => {
+test("keeps queued payloads byte-for-byte aligned with local records", async () => {
   const longUrl = `https://example.com/${"a".repeat(9000)}`;
   const page = await storage.upsertPage(longUrl, longUrl, "t".repeat(5000));
   const [mutation] = await storage.getOutboxBatch();
   const payload = mutation.payload as PageRecord;
 
-  // The outbox copy is trimmed so the server cannot reject the whole batch over it...
-  assert.ok(payload.canonicalUrl.length <= 8192);
-  assert.ok(payload.title.length <= 4096);
-  // ...while the local record keeps everything.
-  assert.equal(page.canonicalUrl.length, longUrl.length);
-  assert.equal(page.title.length, 5000);
+  assert.equal(payload.canonicalUrl, page.canonicalUrl);
+  assert.equal(payload.originalUrl, page.originalUrl);
+  assert.equal(payload.title, page.title);
+});
+
+test("rejects an oversized note instead of silently truncating it", async () => {
+  const page = await storage.upsertPage(
+    "https://example.com/article",
+    "https://example.com/article",
+    "Example",
+  );
+  await assert.rejects(
+    storage.addHighlight({ ...createHighlight(page.id), note: "字".repeat(1_048_577) }),
+    /NOTE_TOO_LONG/,
+  );
+  assert.equal(await storage.db.highlights.count(), 0);
+  assert.equal((await storage.db.outbox.toArray()).filter((item) => item.entityType === "highlight").length, 0);
 });
 
 test("stops retrying a mutation that keeps failing so it cannot freeze the queue", async () => {

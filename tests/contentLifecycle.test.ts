@@ -32,7 +32,8 @@ test("keeps the note editor open while it holds unsaved edits", async () => {
   const ui = await readFile(new URL("../src/contentUi.tsx", import.meta.url), "utf8");
 
   // A plain page click used to unmount the editor and discard whatever was typed.
-  assert.match(controller, /if \(!this\.editorDirty\) \{\s*this\.mounts\.hidePopover\(\);/s);
+  assert.match(controller, /if \(this\.editorDirty\) return;/);
+  assert.match(controller, /if \(event\.key === "Escape"\) \{\s*if \(this\.editorDirty\) return;/s);
   assert.match(controller, /onDirtyChange=\{\(dirty\) => \{\s*this\.editorDirty = dirty;/s);
   assert.match(ui, /props\.onDirtyChange\?\.\(dirty\)/);
 });
@@ -76,5 +77,5 @@ test("drops the tooltip when the viewport moves and aborts model work on close",
   assert.match(source, /document\.removeEventListener\("scroll", this\.handleViewportChange, true\)/);
   assert.match(source, /window\.addEventListener\("resize", this\.handleViewportChange\)/);
   // Closing the AI card has to abort the background request, not just ignore its answer.
-  assert.match(source, /type: "LIUCAI_AI_CANCEL"/);
+  assert.match(source, /type: "LIUCAI_AI_CANCEL", requestId/);
 });

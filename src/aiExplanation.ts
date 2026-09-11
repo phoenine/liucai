@@ -208,7 +208,7 @@ function extractOutputText(value: unknown): string {
   // send `output_text: ""` alongside a complete `output` array, and returning early there threw
   // away a perfectly good response (AI explanations, examples and "test connection" all failed).
   const direct = typeof value.output_text === "string" ? value.output_text : "";
-  if (direct) return direct;
+  if (direct.trim()) return direct;
   if (!Array.isArray(value.output)) return direct;
   return value.output.flatMap((item) => {
     if (!isRecord(item) || !Array.isArray(item.content)) return [];
@@ -235,9 +235,20 @@ function parseJsonOutput(value: unknown): Record<string, unknown> {
  * broken. Braces inside strings are skipped so the object is found correctly.
  */
 function parseFirstObject(text: string): Record<string, unknown> | null {
-  const start = text.indexOf("{");
-  if (start === -1) return null;
+  for (let start = text.indexOf("{"); start !== -1; start = text.indexOf("{", start + 1)) {
+    const candidate = balancedObjectAt(text, start);
+    if (!candidate) continue;
+    try {
+      const parsed: unknown = JSON.parse(candidate);
+      if (isRecord(parsed)) return parsed;
+    } catch {
+      // Keep scanning: prose may contain braces before the actual JSON object.
+    }
+  }
+  return null;
+}
 
+function balancedObjectAt(text: string, start: number): string | null {
   let depth = 0;
   let inString = false;
   let escaped = false;
@@ -245,29 +256,14 @@ function parseFirstObject(text: string): Record<string, unknown> | null {
     const char = text[index];
     if (escaped) {
       escaped = false;
-      continue;
-    }
-    if (char === "\\" && inString) {
+    } else if (char === "\\" && inString) {
       escaped = true;
-      continue;
-    }
-    if (char === '"') {
+    } else if (char === '"') {
       inString = !inString;
-      continue;
-    }
-    if (inString) continue;
-    if (char === "{") {
+    } else if (!inString && char === "{") {
       depth += 1;
-    } else if (char === "}") {
-      depth -= 1;
-      if (depth === 0) {
-        try {
-          const parsed: unknown = JSON.parse(text.slice(start, index + 1));
-          return isRecord(parsed) ? parsed : null;
-        } catch {
-          return null;
-        }
-      }
+    } else if (!inString && char === "}" && --depth === 0) {
+      return text.slice(start, index + 1);
     }
   }
   return null;
@@ -281,7 +277,7 @@ function requireLimitedText(
 ): string {
   if (typeof value !== "string" || !value.trim()) throw new Error("AI_INVALID_RESPONSE");
   const text = value.trim();
-  if (locale === "zh-CN") return text.slice(0, maxChineseCharacters);
+  if (locale === "zh-CN") return Array.from(text).slice(0, maxChineseCharacters).join("");
   return text.split(/\s+/).slice(0, maxEnglishWords).join(" ");
 }
 

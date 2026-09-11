@@ -10,6 +10,7 @@ import {
   XIcon,
 } from "@phosphor-icons/react";
 import { type ReactNode, useEffect, useState } from "react";
+import { MAX_NOTE_LENGTH } from "./aiNote";
 import type { ContentCopy } from "./localization";
 import type { AiExplanation } from "./messages";
 import { continueNoteList } from "./noteFormat";
@@ -556,6 +557,7 @@ export function EditorPopover(props: {
       <label className="liucai-field-label">{props.copy.note}</label>
       <textarea
         autoFocus={props.focus === "note"}
+        maxLength={MAX_NOTE_LENGTH}
         value={note}
         placeholder={props.copy.notePlaceholder}
         onChange={(event) => setNote(event.currentTarget.value)}

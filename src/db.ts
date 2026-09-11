@@ -1,4 +1,5 @@
 import Dexie, { type Table } from "dexie";
+import { MAX_NOTE_LENGTH } from "./aiNote";
 import { generateUuid } from "./id";
 import type {
   HighlightDeletePayload,
@@ -44,20 +45,6 @@ class LiucaiDatabase extends Dexie {
 }
 
 export const db = new LiucaiDatabase();
-
-/**
- * Limits enforced by the server (supabase/migrations/*_create_sync_schema.sql).
- *
- * Exceeding any of them rejects the batch as a whole, and because the oldest mutation sorts first,
- * a single oversized record would keep every later one from ever syncing. Payloads are therefore
- * clamped on their way into the outbox.
- */
-const SERVER_LIMITS = {
-  url: 8192,
-  title: 4096,
-  text: 1_048_576,
-  tags: 100,
-} as const;
 
 /** Failures allowed before a mutation stops being retried in the ordinary batch. */
 const MAX_SYNC_ATTEMPTS = 8;
@@ -121,6 +108,7 @@ export async function getHighlight(id: string): Promise<HighlightRecord | undefi
 
 export async function addHighlight(record: HighlightRecord): Promise<void> {
   const normalized = normalizeHighlightRecord(record);
+  assertNoteWithinLimit(normalized.note);
   await db.transaction("rw", db.highlights, db.outbox, async () => {
     await db.highlights.add(normalized);
     await enqueueSnapshot("highlight", normalized);
@@ -129,6 +117,7 @@ export async function addHighlight(record: HighlightRecord): Promise<void> {
 
 export async function putHighlight(record: HighlightRecord): Promise<void> {
   const normalized = normalizeHighlightRecord(record);
+  assertNoteWithinLimit(normalized.note);
   await db.transaction("rw", db.highlights, db.outbox, async () => {
     await db.highlights.put(normalized);
     await enqueueSnapshot("highlight", normalized);
@@ -348,23 +337,8 @@ function cursorKey(userId: string): string {
   return `cursor:${userId}`;
 }
 
-function withinServerLimits(payload: PageRecord | HighlightRecord): PageRecord | HighlightRecord {
-  const canonicalUrl = payload.canonicalUrl.slice(0, SERVER_LIMITS.url);
-  if ("title" in payload) {
-    return {
-      ...payload,
-      canonicalUrl,
-      originalUrl: payload.originalUrl.slice(0, SERVER_LIMITS.url),
-      title: payload.title.slice(0, SERVER_LIMITS.title),
-    };
-  }
-  return {
-    ...payload,
-    canonicalUrl,
-    text: payload.text.slice(0, SERVER_LIMITS.text),
-    note: payload.note.slice(0, SERVER_LIMITS.text),
-    tags: payload.tags.slice(0, SERVER_LIMITS.tags),
-  };
+function assertNoteWithinLimit(note: string): void {
+  if (note.length > MAX_NOTE_LENGTH) throw new Error("NOTE_TOO_LONG");
 }
 
 async function enqueueSnapshot(
@@ -376,7 +350,7 @@ async function enqueueSnapshot(
     entityType,
     entityId: payload.id,
     operation: "deletedAt" in payload && payload.deletedAt ? "delete" : "upsert",
-    payload: withinServerLimits(payload),
+    payload,
     createdAt: new Date().toISOString(),
     retryCount: 0,
   });

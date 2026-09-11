@@ -72,6 +72,7 @@ test("keeps tooltip notes and tags consistent with sidebar cards", async () => {
 
   assert.ok(noteRule);
   assert.ok(tagRule);
+  assert.match(css, /\.liucai-highlight-tooltip\s*\{[^}]*pointer-events:\s*auto;/s);
   assert.match(noteRule, /background:\s*transparent;/i);
   assert.match(noteRule, /pointer-events:\s*none;/i);
   assert.match(noteRule, /color:\s*#3f4147;/i);

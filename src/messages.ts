@@ -33,6 +33,7 @@ export interface AiExample {
 
 export interface AiExplainRequest {
   type: "LIUCAI_AI_EXPLAIN";
+  requestId: string;
   selectedText: string;
   contextText: string;
   locale: "zh-CN" | "en";
@@ -40,6 +41,7 @@ export interface AiExplainRequest {
 
 export interface AiExampleRequest {
   type: "LIUCAI_AI_EXAMPLE";
+  requestId: string;
   selectedText: string;
   contextText: string;
   concept: string;
@@ -57,6 +59,7 @@ export interface AiTestConnectionRequest {
 
 export interface AiCancelRequest {
   type: "LIUCAI_AI_CANCEL";
+  requestId: string;
 }
 
 export interface PageStatus {
@@ -142,6 +145,7 @@ export function isAiExplainRequest(message: unknown): message is AiExplainReques
   if (typeof message !== "object" || message === null) return false;
   const request = message as Partial<AiExplainRequest>;
   return request.type === "LIUCAI_AI_EXPLAIN"
+    && isRequestId(request.requestId)
     && typeof request.selectedText === "string"
     && request.selectedText.trim().length > 0
     && request.selectedText.length <= 1500
@@ -154,6 +158,7 @@ export function isAiExampleRequest(message: unknown): message is AiExampleReques
   if (typeof message !== "object" || message === null) return false;
   const request = message as Partial<AiExampleRequest>;
   return request.type === "LIUCAI_AI_EXAMPLE"
+    && isRequestId(request.requestId)
     && typeof request.selectedText === "string"
     && request.selectedText.trim().length > 0
     && request.selectedText.length <= 1500
@@ -168,7 +173,12 @@ export function isAiExampleRequest(message: unknown): message is AiExampleReques
 export function isAiCancelRequest(message: unknown): message is AiCancelRequest {
   return typeof message === "object"
     && message !== null
-    && (message as AiCancelRequest).type === "LIUCAI_AI_CANCEL";
+    && (message as AiCancelRequest).type === "LIUCAI_AI_CANCEL"
+    && isRequestId((message as AiCancelRequest).requestId);
+}
+
+function isRequestId(value: unknown): value is string {
+  return typeof value === "string" && value.length > 0 && value.length <= 100;
 }
 
 export function isAiTestConnectionRequest(message: unknown): message is AiTestConnectionRequest {
