@@ -153,9 +153,13 @@ export async function importLegacyRecords(
 }
 
 export async function getOutboxBatch(limit = 100, now = new Date()): Promise<OutboxMutation[]> {
-  const records = await db.outbox.orderBy("createdAt").toArray();
+  const records = await db.outbox.toArray();
   return records
     .filter((record) => !record.nextAttemptAt || record.nextAttemptAt <= now.toISOString())
+    .sort((left, right) => {
+      if (left.entityType !== right.entityType) return left.entityType === "page" ? -1 : 1;
+      return left.createdAt.localeCompare(right.createdAt) || left.mutationId.localeCompare(right.mutationId);
+    })
     .slice(0, limit);
 }
 
@@ -197,13 +201,31 @@ export async function getSyncState(userId: string): Promise<SyncStateRecord | un
 }
 
 export async function bindLocalDatabaseToUser(userId: string): Promise<void> {
-  const binding = await db.syncState.get("bound-account");
-  if (binding?.userId && binding.userId !== userId) {
-    throw new Error("此浏览器的本地数据已绑定其他账号。为避免数据串号，请先使用原账号登录。");
-  }
-  if (!binding) {
-    await db.syncState.put({ key: "bound-account", cursor: 0, userId });
-  }
+  await db.transaction("rw", db.pages, db.highlights, db.outbox, db.syncState, async () => {
+    const binding = await db.syncState.get("bound-account");
+    if (binding?.userId && binding.userId !== userId) {
+      throw new Error("此浏览器的本地数据已绑定其他账号。为避免数据串号，请先使用原账号登录。");
+    }
+    if (!binding) {
+      await db.syncState.put({ key: "bound-account", cursor: 0, userId });
+    }
+
+    const bootstrapKey = `bootstrap:${userId}`;
+    if (await db.syncState.get(bootstrapKey)) return;
+
+    const pendingEntities = new Set(
+      (await db.outbox.toArray()).map((mutation) => `${mutation.entityType}:${mutation.entityId}`),
+    );
+    for (const page of await db.pages.toArray()) {
+      if (!pendingEntities.has(`page:${page.id}`)) await enqueueSnapshot("page", page);
+    }
+    for (const highlight of await db.highlights.toArray()) {
+      if (!pendingEntities.has(`highlight:${highlight.id}`)) await enqueueSnapshot("highlight", highlight);
+    }
+
+    await db.syncState.put({ key: cursorKey(userId), cursor: 0, userId });
+    await db.syncState.put({ key: bootstrapKey, cursor: 0, userId });
+  });
 }
 
 export async function applySyncBatch(userId: string, result: SyncBatchResult): Promise<void> {

@@ -1,9 +1,12 @@
+create extension if not exists pgcrypto with schema extensions;
+
 create sequence public.sync_sequence as bigint;
 
 create table public.pages (
   id uuid primary key,
   user_id uuid not null references auth.users (id) on delete cascade,
   canonical_url text not null,
+  canonical_url_hash bytea generated always as (extensions.digest(canonical_url, 'sha256')) stored,
   original_url text not null,
   title text not null default '',
   created_at timestamptz not null,
@@ -15,7 +18,7 @@ create table public.pages (
   constraint pages_title_length check (char_length(title) <= 4096),
   constraint pages_revision_positive check (revision > 0),
   constraint pages_deleted_at_null check (deleted_at is null),
-  constraint pages_user_canonical_unique unique (user_id, canonical_url)
+  constraint pages_user_canonical_unique unique (user_id, canonical_url_hash)
 );
 
 create table public.highlights (
@@ -73,7 +76,6 @@ create table public.sync_changes (
 );
 
 create index pages_user_updated_idx on public.pages (user_id, updated_at);
-create index highlights_user_canonical_idx on public.highlights (user_id, canonical_url);
 create index highlights_user_updated_idx on public.highlights (user_id, updated_at);
 create index highlight_tombstones_deleted_idx on public.highlight_tombstones (deleted_at);
 create index sync_mutations_user_received_idx on public.sync_mutations (user_id, received_at);
@@ -387,7 +389,7 @@ begin
         case when v_operation = 'delete' then v_now else null end,
         v_revision
       )
-      on conflict (user_id, canonical_url) do update set
+      on conflict on constraint pages_user_canonical_unique do update set
         original_url = excluded.original_url,
         title = excluded.title,
         updated_at = excluded.updated_at,
@@ -413,6 +415,7 @@ begin
       select id into v_page_id
       from public.pages
       where user_id = v_user_id
+        and canonical_url_hash = extensions.digest(v_payload ->> 'canonicalUrl', 'sha256')
         and canonical_url = v_payload ->> 'canonicalUrl'
         and deleted_at is null;
       if v_page_id is null then

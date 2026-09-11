@@ -19,6 +19,15 @@ test("opens settings from an accessible popup header button", async () => {
   assert.match(popup, /lc-popup__settings-button/);
 });
 
+test("keeps cloud auth neutral until the stored session status is loaded", async () => {
+  const popup = await readFile(new URL("../src/popup.tsx", import.meta.url), "utf8");
+  const localization = await readFile(new URL("../src/localization.ts", import.meta.url), "utf8");
+
+  assert.match(popup, /syncStatus === null \? \([\s\S]*copy\.checkingSync/);
+  assert.match(localization, /checkingSync: "正在检查登录状态……"/);
+  assert.match(localization, /checkingSync: "Checking sign-in status…"/);
+});
+
 test("offers browser, Chinese, and English interface language choices", async () => {
   const options = await readFile(new URL("../src/options.tsx", import.meta.url), "utf8");
   const localization = await readFile(new URL("../src/localization.ts", import.meta.url), "utf8");

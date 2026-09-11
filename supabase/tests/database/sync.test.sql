@@ -1,7 +1,7 @@
 begin;
 
 create extension if not exists pgtap with schema extensions;
-select plan(46);
+select plan(49);
 
 select has_table('public', 'pages', 'pages table exists');
 select has_table('public', 'highlights', 'highlights table exists');
@@ -480,6 +480,77 @@ select is(
   (select count(*) from public.sync_mutations where mutation_id = 'a0000000-0000-0000-0000-000000000001'),
   0::bigint,
   'a new mutation prunes receipts older than the 180-day idempotency window'
+);
+
+set local role authenticated;
+select set_config(
+  'request.jwt.claims',
+  '{"sub":"10000000-0000-0000-0000-000000000001","role":"authenticated"}',
+  true
+);
+select lives_ok(
+  format(
+    $sql$
+      select public.apply_sync_batch(
+        %L::jsonb,
+        0,
+        500
+      )
+    $sql$,
+    jsonb_build_array(
+      jsonb_build_object(
+        'mutationId', 'a0000000-0000-0000-0000-000000000099',
+        'entityType', 'page',
+        'entityId', '30000000-0000-0000-0000-000000000099',
+        'operation', 'upsert',
+        'payload', jsonb_build_object(
+          'id', '30000000-0000-0000-0000-000000000099',
+          'canonicalUrl', 'https://example.com/' || repeat('x', 3000),
+          'originalUrl', 'https://example.com/' || repeat('x', 3000),
+          'title', 'Long canonical URL',
+          'createdAt', '2026-09-11T00:00:00.000Z',
+          'updatedAt', '2026-09-11T00:00:00.000Z'
+        )
+      ),
+      jsonb_build_object(
+        'mutationId', 'a0000000-0000-0000-0000-000000000098',
+        'entityType', 'highlight',
+        'entityId', '40000000-0000-0000-0000-000000000099',
+        'operation', 'upsert',
+        'payload', jsonb_build_object(
+          'id', '40000000-0000-0000-0000-000000000099',
+          'pageId', '30000000-0000-0000-0000-000000000099',
+          'canonicalUrl', 'https://example.com/' || repeat('x', 3000),
+          'text', 'Long URL highlight',
+          'color', 'gold',
+          'note', '',
+          'tags', jsonb_build_array(),
+          'selector', jsonb_build_object(
+            'exact', 'Long URL highlight',
+            'prefix', '',
+            'suffix', '',
+            'start', 0,
+            'end', 18
+          ),
+          'createdAt', '2026-09-11T00:00:00.000Z',
+          'updatedAt', '2026-09-11T00:00:00.000Z'
+        )
+      )
+    )::text
+  ),
+  'a page and highlight with a canonical URL larger than a B-tree index row are accepted'
+);
+
+reset role;
+select is(
+  (select count(*) from public.pages where id = '30000000-0000-0000-0000-000000000099'),
+  1::bigint,
+  'the long canonical URL page is stored'
+);
+select is(
+  (select count(*) from public.highlights where id = '40000000-0000-0000-0000-000000000099'),
+  1::bigint,
+  'the long canonical URL highlight is stored'
 );
 
 select * from finish();

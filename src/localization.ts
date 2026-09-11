@@ -49,6 +49,7 @@ export interface PopupCopy {
   settings: string;
   currentPage: string;
   cloudSync: string;
+  checkingSync: string;
   signedIn: string;
   working: string;
   syncNow: string;
@@ -254,6 +255,7 @@ const POPUP_COPY: Record<ResolvedLocale, PopupCopy> = {
     settings: "设置",
     currentPage: "当前页面",
     cloudSync: "云端同步",
+    checkingSync: "正在检查登录状态……",
     signedIn: "已登录",
     working: "处理中……",
     syncNow: "立即同步",
@@ -293,6 +295,7 @@ const POPUP_COPY: Record<ResolvedLocale, PopupCopy> = {
     settings: "Settings",
     currentPage: "Current page",
     cloudSync: "Cloud sync",
+    checkingSync: "Checking sign-in status…",
     signedIn: "Signed in",
     working: "Working…",
     syncNow: "Sync now",
