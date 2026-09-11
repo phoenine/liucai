@@ -1,23 +1,32 @@
 import { ContentMounts } from "./contentMount";
 import { ContentTransitionQueue } from "./contentTransitionQueue";
 import {
+  AiExplanationCard,
+  type AiExplanationCardState,
   EditorPopover,
   ExistingHighlightToolbar,
   HighlightSidebar,
   HighlightTooltip,
+  LearningToolbar,
   MiniSidebarLauncher,
   SelectionToolbar,
   type EditorFocus,
 } from "./contentUi";
+import { appendNote, formatAiExplanationNote } from "./aiNote";
 import { createSelectorFromRange, rangesFromSelectors } from "./domText";
 import { applyHighlight, removeHighlightFromDom, updateHighlightAttributes } from "./highlightDom";
 import { HoverRequestTracker } from "./hoverRequest";
 import { generateUuid } from "./id";
 import { migrateLegacySiteData } from "./legacyMigration";
 import {
+  AI_AUTH_STATE_STORAGE_KEY,
   isPageStatusRequest,
   isSetSiteDisabledRequest,
   type PageStatus,
+  type AiExplanation,
+  type AiExample,
+  type StorageResponse,
+  type SyncStatus,
 } from "./messages";
 import {
   createObsidianExportFilename,
@@ -25,6 +34,7 @@ import {
   formatObsidianPageExport,
 } from "./obsidianExport";
 import { getRangeDisplayText } from "./rangeDisplayText";
+import { getSelectionContext } from "./selectionContext";
 import {
   getContentCopy,
   resolveInterfaceLocale,
@@ -36,6 +46,11 @@ import {
   PREFERENCES_STORAGE_KEY,
 } from "./preferences";
 import { isHostnameDisabled, setHostnameDisabled } from "./sitePreferences";
+import {
+  getSelectionToolbarKind,
+  getVisibleSelectionToolbarKind,
+  type SelectionToolbarKind,
+} from "./selectionIntent";
 import {
   addHighlight,
   getActiveHighlights,
@@ -80,6 +95,8 @@ export class ContentController {
   private interfaceLocale: ResolvedLocale = resolveInterfaceLocale("auto");
   private contentCopy: ContentCopy = getContentCopy(this.interfaceLocale);
   private locationTimer: number | null = null;
+  private selectionRequestId = 0;
+  private aiRequestId = 0;
   private disposed = false;
 
   async initialize(): Promise<void> {
@@ -124,7 +141,6 @@ export class ContentController {
     }
 
     await this.refreshPreferences();
-    await this.getCurrentPage();
     await this.restoreHighlights();
     await this.refreshSidebarData();
 
@@ -150,6 +166,7 @@ export class ContentController {
     this.pageActive = false;
     this.sidebarOpen = false;
     this.currentSelectionRange = null;
+    this.aiRequestId += 1;
     this.hoverRequests.clear();
     this.mounts.hideAll();
     for (const span of Array.from(document.querySelectorAll<HTMLElement>(".liucai-highlight"))) {
@@ -208,12 +225,22 @@ export class ContentController {
         changes[PREFERENCES_STORAGE_KEY].newValue,
       );
       if (languageChanged && this.pageActive) {
+        this.aiRequestId += 1;
         this.mounts.hideToolbar();
         this.mounts.hidePopover();
         void this.transitions
           .run(() => this.refreshSidebarData())
           .catch((error) => this.reportError("language preference sync", error));
       }
+      if (Object.keys(changes).length === 1) return;
+    }
+
+    if (changes[AI_AUTH_STATE_STORAGE_KEY]) {
+      this.selectionRequestId += 1;
+      this.aiRequestId += 1;
+      this.currentSelectionRange = null;
+      this.mounts.hideToolbar();
+      this.mounts.hidePopover();
       if (Object.keys(changes).length === 1) return;
     }
 
@@ -227,6 +254,7 @@ export class ContentController {
 
   private async refreshSyncedPage(): Promise<void> {
     if (!this.pageActive || this.disposed) return;
+    this.aiRequestId += 1;
     this.mounts.hideToolbar();
     this.mounts.hidePopover();
     for (const span of Array.from(document.querySelectorAll<HTMLElement>(".liucai-highlight"))) {
@@ -238,6 +266,7 @@ export class ContentController {
 
   private handleKeyDown = (event: KeyboardEvent): void => {
     if (event.key === "Escape") {
+      this.aiRequestId += 1;
       this.mounts.hideToolbar();
       this.mounts.hidePopover();
     }
@@ -273,21 +302,40 @@ export class ContentController {
   private handleMouseUp = (event: MouseEvent): void => {
     if (
       (event.target as Element | null)?.closest?.(
-        ".liucai-toolbar,.liucai-popover,.liucai-sidebar,.liucai-mini-sidebar,.liucai-highlight",
+        ".liucai-toolbar,.liucai-popover,.liucai-sidebar,.liucai-mini-sidebar",
       )
     ) {
       return;
     }
 
+    const requestId = ++this.selectionRequestId;
     const selection = window.getSelection();
     if (!selection || selection.rangeCount === 0 || !selection.toString().trim()) {
+      this.currentSelectionRange = null;
       this.mounts.hideToolbar();
       return;
     }
 
+    this.aiRequestId += 1;
+    this.mounts.hidePopover();
+
     this.currentSelectionRange = selection.getRangeAt(0).cloneRange();
-    const rect = this.currentSelectionRange.getBoundingClientRect();
-    this.showSelectionToolbar(rect.left + rect.width / 2, Math.max(8, rect.top - 56));
+    const range = this.currentSelectionRange;
+    const kind = getSelectionToolbarKind(
+      range,
+      document.querySelectorAll<HTMLElement>(".liucai-highlight"),
+    );
+    this.runAsync("resolve selection toolbar", async () => {
+      const signedIn = await this.getAiSignedIn();
+      if (requestId !== this.selectionRequestId || !this.isCurrentSelection(range)) return;
+      const rect = range.getBoundingClientRect();
+      this.showSelectionToolbar(
+        kind,
+        signedIn,
+        rect.left + rect.width / 2,
+        Math.max(8, rect.top - 56),
+      );
+    });
   };
 
   private handleDocumentClickEvent = (event: MouseEvent): void => {
@@ -346,6 +394,14 @@ export class ContentController {
       return;
     }
 
+    const selection = window.getSelection();
+    if (selection && !selection.isCollapsed && selection.toString().trim()) {
+      return;
+    }
+
+    this.aiRequestId += 1;
+    this.mounts.hidePopover();
+
     const highlightEl = target?.closest?.(".liucai-highlight") as HTMLElement | null;
     if (!highlightEl) return;
 
@@ -385,14 +441,37 @@ export class ContentController {
     return Boolean(interactive && interactive.contains(highlightEl));
   }
 
-  private showSelectionToolbar(centerX: number, top: number): void {
+  private showSelectionToolbar(
+    kind: SelectionToolbarKind,
+    signedIn: boolean,
+    centerX: number,
+    top: number,
+  ): void {
+    const visibleKind = getVisibleSelectionToolbarKind(kind, signedIn);
+    if (!visibleKind) {
+      this.mounts.hideToolbar();
+      return;
+    }
+
+    if (visibleKind === "learn") {
+      this.mounts.showToolbar(
+        centerX,
+        top,
+        36,
+        "liucai-toolbar--learning",
+        <LearningToolbar copy={this.contentCopy} onAi={this.handleAiSelection} />,
+      );
+      return;
+    }
+
     this.mounts.showToolbar(
       centerX,
       top,
-      164,
+      signedIn ? 202 : 164,
       "liucai-toolbar--selection",
       <SelectionToolbar
         copy={this.contentCopy}
+        onAi={signedIn ? this.handleAiSelection : undefined}
         onColor={(color) => this.runAsync(
           "create highlight",
           () => this.createHighlight(color, { openEditor: false }),
@@ -413,6 +492,143 @@ export class ContentController {
         )}
       />,
     );
+  }
+
+  private handleAiSelection = (): void => {
+    const range = this.currentSelectionRange?.cloneRange();
+    if (!range) return;
+
+    const selectedText = getRangeDisplayText(range).trim() || range.toString().trim();
+    if (!selectedText) return;
+    const contextText = getSelectionContext(range);
+    const rect = range.getBoundingClientRect();
+    const highlightIds = this.getIntersectingHighlightIds(range);
+    const requestId = ++this.aiRequestId;
+    this.mounts.hideToolbar();
+    window.getSelection()?.removeAllRanges();
+
+    const render = (state: AiExplanationCardState): void => {
+      if (requestId !== this.aiRequestId) return;
+      const explanation = state.status === "success" ? state.explanation : null;
+      const node = this.mounts.showPopover(
+        rect.left,
+        rect.bottom + 8,
+        <AiExplanationCard
+          copy={this.contentCopy}
+          state={state}
+          canAppend={highlightIds.length <= 1}
+          createsHighlight={highlightIds.length === 0}
+          onLoadExample={async () => {
+            if (!explanation) throw new Error("AI_EXPLANATION_MISSING");
+            const response = await chrome.runtime.sendMessage({
+              type: "LIUCAI_AI_EXAMPLE",
+              selectedText: selectedText.slice(0, 1500),
+              contextText: contextText.slice(0, 2500),
+              concept: explanation.concept,
+              locale: this.interfaceLocale,
+            }) as StorageResponse<AiExample> | undefined;
+            if (!response?.ok) throw new Error(response?.error ?? "AI_REQUEST_FAILED");
+            return response.data.example;
+          }}
+          onAppend={async (example) => {
+            if (!explanation) return;
+            await this.appendAiExplanation(range, highlightIds, explanation, example);
+          }}
+          onRetry={() => request()}
+          onClose={() => {
+            this.aiRequestId += 1;
+            this.mounts.hidePopover();
+          }}
+        />,
+        "liucai-ai-popover",
+      );
+      this.mounts.fitPopoverInViewport(node);
+    };
+
+    const request = (): void => {
+      render({ status: "loading" });
+      void chrome.runtime.sendMessage({
+        type: "LIUCAI_AI_EXPLAIN",
+        selectedText: selectedText.slice(0, 1500),
+        contextText: contextText.slice(0, 2500),
+        locale: this.interfaceLocale,
+      }).then((response: StorageResponse<AiExplanation> | undefined) => {
+        if (requestId !== this.aiRequestId) return;
+        if (!response?.ok) {
+          render({ status: "error", error: response?.error ?? "AI_REQUEST_FAILED" });
+          return;
+        }
+        render({ status: "success", explanation: response.data });
+      }).catch((error) => {
+        render({ status: "error", error: this.stringifyError(error) });
+      });
+    };
+
+    request();
+  };
+
+  private getIntersectingHighlightIds(range: Range): string[] {
+    const ids = new Set<string>();
+    for (const highlight of document.querySelectorAll<HTMLElement>(".liucai-highlight[data-id]")) {
+      try {
+        if (range.intersectsNode(highlight) && highlight.dataset.id) ids.add(highlight.dataset.id);
+      } catch {
+        // Ignore detached nodes while the host page is updating its DOM.
+      }
+    }
+    return [...ids];
+  }
+
+  private async appendAiExplanation(
+    range: Range,
+    highlightIds: string[],
+    explanation: AiExplanation,
+    example?: string,
+  ): Promise<void> {
+    if (highlightIds.length > 1) throw new Error("AI_NOTE_MULTIPLE_HIGHLIGHTS");
+    const note = formatAiExplanationNote(explanation, this.interfaceLocale, example);
+
+    if (highlightIds.length === 1) {
+      const record = await getHighlight(highlightIds[0]);
+      if (!record || record.deletedAt) throw new Error("AI_NOTE_TARGET_MISSING");
+      const updated: HighlightRecord = {
+        ...normalizeHighlightRecord(record),
+        note: appendNote(record.note, note),
+        updatedAt: new Date().toISOString(),
+      };
+      await putHighlight(updated);
+      updateHighlightAttributes(updated);
+      await this.refreshSidebarData();
+      return;
+    }
+
+    this.currentSelectionRange = range.cloneRange();
+    await this.createHighlight(this.defaultAnnotationColor, {
+      openEditor: false,
+      initialNote: note,
+    });
+  }
+
+  private async getAiSignedIn(): Promise<boolean> {
+    try {
+      const response = await chrome.runtime.sendMessage({
+        type: "LIUCAI_SYNC_GET_STATUS",
+      }) as StorageResponse<SyncStatus> | undefined;
+      return Boolean(response?.ok && response.data.signedIn);
+    } catch (error) {
+      this.reportError("AI login status", error);
+      return false;
+    }
+  }
+
+  private isCurrentSelection(range: Range): boolean {
+    const selection = window.getSelection();
+    if (!selection || selection.rangeCount === 0 || selection.isCollapsed) return false;
+    const current = selection.getRangeAt(0);
+    return current.startContainer === range.startContainer
+      && current.startOffset === range.startOffset
+      && current.endContainer === range.endContainer
+      && current.endOffset === range.endOffset;
   }
 
   private async refreshPreferences(): Promise<void> {
@@ -564,7 +780,7 @@ export class ContentController {
 
   private async createHighlight(
     color: HighlightColor,
-    options: { openEditor: boolean; focus?: EditorFocus },
+    options: { openEditor: boolean; focus?: EditorFocus; initialNote?: string },
   ): Promise<void> {
     const range = this.currentSelectionRange;
     this.mounts.hideToolbar();
@@ -583,7 +799,7 @@ export class ContentController {
       canonicalUrl: this.identity.canonicalUrl,
       text: displayText || selector.exact,
       color,
-      note: "",
+      note: options.initialNote ?? "",
       tags: [],
       selector,
       createdAt: now,

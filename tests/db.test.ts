@@ -145,6 +145,55 @@ test("applies acknowledged remote changes and advances the account cursor atomic
   assert.equal(await storage.getSyncCursor("user-a"), 7);
 });
 
+test("applies a minimal remote highlight deletion without recreating missing content", async () => {
+  const page = await storage.upsertPage(
+    "https://example.com/article",
+    "https://example.com/article",
+    "Example",
+  );
+  const highlight = createHighlight(page.id);
+  await storage.addHighlight(highlight);
+  await storage.db.outbox.clear();
+
+  await storage.applySyncBatch("user-a", {
+    acknowledgedMutationIds: [],
+    changes: [{
+      sequence: 8,
+      revision: 8,
+      entityType: "highlight",
+      entityId: highlight.id,
+      operation: "delete",
+      payload: {
+        id: highlight.id,
+        deletedAt: "2026-09-11T00:00:00.000Z",
+      },
+    }],
+    nextCursor: 8,
+    hasMore: false,
+  });
+
+  assert.equal((await storage.getHighlight(highlight.id))?.deletedAt, "2026-09-11T00:00:00.000Z");
+
+  await storage.applySyncBatch("user-b", {
+    acknowledgedMutationIds: [],
+    changes: [{
+      sequence: 9,
+      revision: 9,
+      entityType: "highlight",
+      entityId: "unknown-highlight",
+      operation: "delete",
+      payload: {
+        id: "unknown-highlight",
+        deletedAt: "2026-09-11T00:01:00.000Z",
+      },
+    }],
+    nextCursor: 9,
+    hasMore: false,
+  });
+
+  assert.equal(await storage.getHighlight("unknown-highlight"), undefined);
+});
+
 test("does not overwrite an entity that still has a pending local mutation", async () => {
   const page = await storage.upsertPage(
     "https://example.com/article",

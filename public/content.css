@@ -118,6 +118,15 @@
   color: #d97706;
 }
 
+.liucai-icon-button--ai {
+  background: #ffffff;
+  color: #475569;
+}
+
+.liucai-icon-button--ai:hover {
+  color: #111827;
+}
+
 .liucai-icon-button--delete:hover {
   background: #ffffff;
   color: #dc2626;
@@ -227,6 +236,158 @@
   color: #374151;
 }
 
+.liucai-ai-popover {
+  padding: 0;
+  width: min(380px, calc(100vw - 16px));
+}
+
+.liucai-ai-card {
+  display: block;
+  padding: 15px;
+}
+
+.liucai-ai-card__header,
+.liucai-ai-card__title,
+.liucai-ai-card__loading,
+.liucai-ai-card__actions {
+  align-items: center;
+  display: flex;
+}
+
+.liucai-ai-card__header {
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.liucai-ai-card__title {
+  color: #334155;
+  font: 700 13px/1.2 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  gap: 7px;
+}
+
+.liucai-ai-card__title svg {
+  height: 18px;
+  width: 18px;
+}
+
+.liucai-popover .liucai-ai-card__close {
+  align-items: center;
+  color: #64748b;
+  display: inline-flex;
+  justify-content: center;
+  padding: 4px;
+}
+
+.liucai-ai-card__close svg {
+  height: 17px;
+  width: 17px;
+}
+
+.liucai-ai-card h3 {
+  color: #0f172a;
+  font: 700 17px/1.35 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  margin: 0 0 12px;
+}
+
+.liucai-ai-card__section {
+  background: #f8fafc;
+  border-radius: 10px;
+  margin-top: 8px;
+  padding: 10px 11px;
+}
+
+.liucai-ai-card__section > span {
+  color: #64748b;
+  display: block;
+  font: 700 11px/1.2 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  margin-bottom: 5px;
+}
+
+.liucai-ai-card__section p,
+.liucai-ai-card__hint {
+  color: #334155;
+  font: 13px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  margin: 0;
+}
+
+.liucai-ai-card__example {
+  border-left: 3px solid #f59e0b;
+  color: #475569;
+  font: 13px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  margin-top: 10px;
+  padding: 5px 0 5px 10px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.liucai-ai-card__hint {
+  color: #64748b;
+  font-size: 11px;
+  margin-top: 9px;
+}
+
+.liucai-ai-card__hint.is-warning,
+.liucai-ai-card__error {
+  color: #b45309;
+}
+
+.liucai-ai-card__actions {
+  flex-wrap: wrap;
+  gap: 7px;
+  justify-content: flex-start;
+  margin-top: 13px;
+}
+
+.liucai-popover .liucai-ai-card__actions button[data-action="primary"] {
+  background: #111827;
+  color: #ffffff;
+}
+
+.liucai-popover .liucai-ai-card__actions button[data-action="secondary"],
+.liucai-ai-card__error button[data-action="secondary"] {
+  background: #f1f5f9;
+  color: #334155;
+}
+
+.liucai-popover button:disabled {
+  cursor: default;
+  opacity: 0.48;
+}
+
+.liucai-ai-card__loading {
+  color: #64748b;
+  font: 13px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  gap: 9px;
+  min-height: 76px;
+}
+
+.liucai-ai-card__spinner {
+  animation: liucai-spin 800ms linear infinite;
+  border: 2px solid #e2e8f0;
+  border-radius: 50%;
+  border-top-color: #475569;
+  height: 18px;
+  width: 18px;
+}
+
+.liucai-ai-card__error {
+  display: grid;
+  font: 13px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  gap: 8px;
+}
+
+.liucai-ai-card__error button {
+  justify-self: start;
+}
+
+@keyframes liucai-spin {
+  to { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .liucai-ai-card__spinner { animation-duration: 1600ms; }
+}
+
 /* ── Highlight note/tag indicator icon ── */
 
 .liucai-highlight--last[data-has-note="true"],
@@ -234,17 +395,17 @@
   position: relative;
 }
 
+/* Phosphor Icons: ChatCircleDots, regular weight (MIT). */
 .liucai-highlight--last[data-has-note="true"]::after,
 .liucai-highlight--last[data-has-tags="true"]::after {
   content: "";
   display: inline-block;
-  width: 13px;
-  height: 13px;
-  margin-left: 1px;
+  width: 14px;
+  height: 14px;
+  margin-left: 2px;
   vertical-align: middle;
-  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z'/%3E%3C/svg%3E")
-    center / contain no-repeat;
-  opacity: 0.55;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 256 256' fill='%23475569'%3E%3Cpath d='M140,128a12,12,0,1,1-12-12A12,12,0,0,1,140,128ZM84,116a12,12,0,1,0,12,12A12,12,0,0,0,84,116Zm88,0a12,12,0,1,0,12,12A12,12,0,0,0,172,116Zm60,12A104,104,0,0,1,79.12,219.82L45.07,231.17a16,16,0,0,1-20.24-20.24l11.35-34.05A104,104,0,1,1,232,128Zm-16,0A88,88,0,1,0,51.81,172.06a8,8,0,0,1,.66,6.54L40,216,77.4,203.53a7.85,7.85,0,0,1,2.53-.42,8,8,0,0,1,4,1.08A88,88,0,0,0,216,128Z'/%3E%3C/svg%3E") center / contain no-repeat;
+  opacity: 0.68;
   pointer-events: none;
 }
 

@@ -1,4 +1,5 @@
 import type {
+  HighlightDeletePayload,
   HighlightRecord,
   OutboxMutation,
   PageRecord,
@@ -42,13 +43,16 @@ function parseRemoteChange(value: unknown): RemoteChange {
     || !isNonNegativeInteger(value.revision)
     || !isString(value.entityId)
     || (value.entityType !== "page" && value.entityType !== "highlight")
-    || (value.operation !== "upsert" && value.operation !== "delete")) {
+    || (value.operation !== "upsert" && value.operation !== "delete")
+    || (value.entityType === "page" && value.operation === "delete")) {
     throw new Error("同步服务返回了无效的变更记录。");
   }
 
   const payload = value.entityType === "page"
     ? parsePagePayload(value.payload)
-    : parseHighlightPayload(value.payload);
+    : value.operation === "delete"
+      ? parseHighlightDeletePayload(value.payload)
+      : parseHighlightPayload(value.payload);
   return {
     sequence: value.sequence,
     entityType: value.entityType,
@@ -57,6 +61,13 @@ function parseRemoteChange(value: unknown): RemoteChange {
     revision: value.revision,
     payload,
   };
+}
+
+function parseHighlightDeletePayload(value: unknown): HighlightDeletePayload {
+  if (!isObject(value) || !isString(value.id) || !isString(value.deletedAt)) {
+    throw new Error("同步服务返回了无效的高亮删除记录。");
+  }
+  return { id: value.id, deletedAt: value.deletedAt };
 }
 
 function parsePagePayload(value: unknown): PageRecord {

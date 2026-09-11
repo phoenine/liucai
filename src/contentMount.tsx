@@ -22,10 +22,15 @@ export class ContentMounts {
     this.toolbar = this.renderInto(node, children);
   }
 
-  showPopover(left: number, top: number, children: ReactNode): HTMLElement {
+  showPopover(
+    left: number,
+    top: number,
+    children: ReactNode,
+    stateClass = "liucai-editor-popover",
+  ): HTMLElement {
     this.hidePopover();
     const node = document.createElement("div");
-    node.className = "liucai-popover liucai-editor-popover";
+    node.className = `liucai-popover ${stateClass}`;
     node.style.left = `${Math.min(Math.max(8, left), Math.max(8, window.innerWidth - 336))}px`;
     node.style.top = `${Math.min(Math.max(8, top), Math.max(8, window.innerHeight - 328))}px`;
     node.style.visibility = "hidden";

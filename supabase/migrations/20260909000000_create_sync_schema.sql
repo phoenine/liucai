@@ -14,6 +14,7 @@ create table public.pages (
   constraint pages_original_url_length check (char_length(original_url) between 1 and 8192),
   constraint pages_title_length check (char_length(title) <= 4096),
   constraint pages_revision_positive check (revision > 0),
+  constraint pages_deleted_at_null check (deleted_at is null),
   constraint pages_user_canonical_unique unique (user_id, canonical_url)
 );
 
@@ -38,6 +39,15 @@ create table public.highlights (
   constraint highlights_tags_count check (cardinality(tags) <= 100),
   constraint highlights_selector_object check (jsonb_typeof(selector) = 'object'),
   constraint highlights_revision_positive check (revision > 0)
+);
+
+create table public.highlight_tombstones (
+  user_id uuid not null references auth.users (id) on delete cascade,
+  highlight_id uuid not null,
+  deleted_at timestamptz not null,
+  revision bigint not null,
+  primary key (user_id, highlight_id),
+  constraint highlight_tombstones_revision_positive check (revision > 0)
 );
 
 create table public.sync_mutations (
@@ -65,12 +75,15 @@ create table public.sync_changes (
 create index pages_user_updated_idx on public.pages (user_id, updated_at);
 create index highlights_user_canonical_idx on public.highlights (user_id, canonical_url);
 create index highlights_user_updated_idx on public.highlights (user_id, updated_at);
-create index highlights_user_deleted_idx on public.highlights (user_id, deleted_at)
-  where deleted_at is not null;
+create index highlight_tombstones_deleted_idx on public.highlight_tombstones (deleted_at);
+create index sync_mutations_user_received_idx on public.sync_mutations (user_id, received_at);
 create index sync_changes_user_sequence_idx on public.sync_changes (user_id, sequence);
+create index sync_changes_entity_latest_idx
+  on public.sync_changes (user_id, entity_type, entity_id, sequence desc);
 
 alter table public.pages enable row level security;
 alter table public.highlights enable row level security;
+alter table public.highlight_tombstones enable row level security;
 alter table public.sync_mutations enable row level security;
 alter table public.sync_changes enable row level security;
 
@@ -94,6 +107,7 @@ create policy sync_changes_select_own
 
 revoke all on table public.pages from anon, authenticated;
 revoke all on table public.highlights from anon, authenticated;
+revoke all on table public.highlight_tombstones from anon, authenticated;
 revoke all on table public.sync_mutations from anon, authenticated;
 revoke all on table public.sync_changes from anon, authenticated;
 revoke all on sequence public.sync_sequence from anon, authenticated;
@@ -101,6 +115,145 @@ revoke all on sequence public.sync_sequence from anon, authenticated;
 grant select on table public.pages to authenticated;
 grant select on table public.highlights to authenticated;
 grant select on table public.sync_changes to authenticated;
+
+create or replace function public.prevent_deleted_highlight_resurrection()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_deleted_at timestamptz;
+begin
+  if new.entity_type = 'highlight' and new.operation = 'upsert' then
+    select deleted_at into v_deleted_at
+    from public.highlight_tombstones
+    where user_id = new.user_id and highlight_id = new.entity_id;
+
+    if found then
+      new.operation := 'delete';
+      delete from public.highlights
+      where user_id = new.user_id
+        and id = new.entity_id
+        and revision = new.revision;
+    end if;
+  end if;
+  if new.entity_type = 'highlight' and new.operation = 'delete' then
+    v_deleted_at := coalesce(
+      v_deleted_at,
+      (new.payload ->> 'deletedAt')::timestamptz,
+      new.created_at
+    );
+    new.payload := jsonb_build_object(
+      'id', new.entity_id,
+      'deletedAt', v_deleted_at
+    );
+  end if;
+  return new;
+end;
+$$;
+
+revoke all on function public.prevent_deleted_highlight_resurrection() from public, anon, authenticated;
+
+create trigger prevent_deleted_highlight_resurrection_before_change
+before insert on public.sync_changes
+for each row
+execute function public.prevent_deleted_highlight_resurrection();
+
+create or replace function public.record_deleted_highlight()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  if new.entity_type = 'highlight' and new.operation = 'delete' then
+    insert into public.highlight_tombstones (
+      user_id,
+      highlight_id,
+      deleted_at,
+      revision
+    ) values (
+      new.user_id,
+      new.entity_id,
+      (new.payload ->> 'deletedAt')::timestamptz,
+      new.revision
+    )
+    on conflict (user_id, highlight_id) do update set
+      revision = excluded.revision;
+
+    delete from public.highlights
+    where user_id = new.user_id
+      and id = new.entity_id
+      and deleted_at is not null
+      and revision = new.revision;
+  end if;
+  return new;
+end;
+$$;
+
+revoke all on function public.record_deleted_highlight() from public, anon, authenticated;
+
+create trigger record_deleted_highlight_after_change
+after insert on public.sync_changes
+for each row
+execute function public.record_deleted_highlight();
+
+comment on table public.highlight_tombstones is
+  'Minimal deletion metadata used to prevent stale clients from resurrecting highlights.';
+comment on function public.prevent_deleted_highlight_resurrection() is
+  'Turns a stale upsert for a deleted highlight into a fresh delete change.';
+comment on function public.record_deleted_highlight() is
+  'Records one durable tombstone per deleted highlight and removes its business row.';
+
+create or replace function public.compact_sync_changes()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  delete from public.sync_changes
+  where user_id = new.user_id
+    and entity_type = new.entity_type
+    and entity_id = new.entity_id
+    and sequence < new.sequence;
+  return new;
+end;
+$$;
+
+revoke all on function public.compact_sync_changes() from public, anon, authenticated;
+
+create trigger compact_sync_changes_after_change
+after insert on public.sync_changes
+for each row
+execute function public.compact_sync_changes();
+
+create or replace function public.prune_old_sync_mutations()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  delete from public.sync_mutations
+  where user_id = new.user_id
+    and received_at < new.received_at - interval '180 days';
+  return new;
+end;
+$$;
+
+revoke all on function public.prune_old_sync_mutations() from public, anon, authenticated;
+
+create trigger prune_old_sync_mutations_after_insert
+after insert on public.sync_mutations
+for each row
+execute function public.prune_old_sync_mutations();
+
+comment on function public.compact_sync_changes() is
+  'Keeps only the latest sync snapshot for each user entity.';
+comment on function public.prune_old_sync_mutations() is
+  'Retains a rolling 180-day mutation idempotency window per active user.';
 
 create or replace function public.apply_sync_batch(
   p_mutations jsonb default '[]'::jsonb,

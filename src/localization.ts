@@ -21,6 +21,24 @@ export interface OptionsCopy {
   defaultColor: string;
   defaultColorHelp: string;
   colors: Record<"gold" | "mint" | "coral", { label: string; description: string }>;
+  llm: string;
+  llmDescription: string;
+  llmProvider: string;
+  llmProviders: Record<"lm-studio" | "openai", { label: string; description: string }>;
+  llmBaseUrl: string;
+  llmModel: string;
+  llmModelPlaceholder: string;
+  llmApiKey: string;
+  llmOptionalApiKey: string;
+  llmStudioHelp: string;
+  openaiEndpoint: string;
+  openaiDirectWarning: string;
+  saveLlm: string;
+  testLlm: string;
+  testingLlm: string;
+  llmTestSuccess: string;
+  llmTestFailed: string;
+  incompleteLlm: string;
   privacy: string;
   privacyDescription: string;
   version: string;
@@ -45,6 +63,7 @@ export interface PopupCopy {
   quickActions: string;
   selectionAction: string;
   existingHighlightAction: string;
+  learningSelectionAction: string;
   localStorageAction: string;
   updating: string;
   restoreSite: string;
@@ -67,6 +86,7 @@ export interface PopupCopy {
 
 export interface ContentCopy {
   colors: Record<"gold" | "mint" | "coral", string>;
+  aiUnderstanding: string;
   note: string;
   tags: string;
   changeColor: string;
@@ -100,6 +120,25 @@ export interface ContentCopy {
   tagsPlaceholder: string;
   tagSeparator: string;
   save: string;
+  aiLoading: string;
+  aiTitle: string;
+  aiSummaryLabel: string;
+  aiContextLabel: string;
+  aiExample: string;
+  aiHideExample: string;
+  aiExampleLoading: string;
+  aiExampleFailed: string;
+  aiAppendNote: string;
+  aiAppendCreatesHighlight: string;
+  aiAppending: string;
+  aiAppended: string;
+  aiAppendUnavailable: string;
+  aiThoughtCard: string;
+  aiThoughtCardLater: string;
+  aiFailed: string;
+  aiRetry: string;
+  aiClose: string;
+  aiError: (code: string) => string;
 }
 
 const OPTIONS_COPY: Record<ResolvedLocale, OptionsCopy> = {
@@ -130,6 +169,27 @@ const OPTIONS_COPY: Record<ResolvedLocale, OptionsCopy> = {
       mint: { label: "薄荷", description: "清爽轻盈，适合概念和定义" },
       coral: { label: "珊瑚", description: "强调感更强，适合重点提醒" },
     },
+    llm: "大模型",
+    llmDescription: "配置 AI 理解使用的模型服务。两种方式均由扩展直接连接。",
+    llmProvider: "连接方式",
+    llmProviders: {
+      "lm-studio": { label: "LM Studio", description: "连接本机或局域网中的 OpenAI 兼容服务" },
+      openai: { label: "OpenAI", description: "使用 API Key 直连 OpenAI 在线模型" },
+    },
+    llmBaseUrl: "服务地址",
+    llmModel: "模型 ID",
+    llmModelPlaceholder: "输入服务返回的模型 ID",
+    llmApiKey: "OpenAI API Key",
+    llmOptionalApiKey: "访问令牌（可选）",
+    llmStudioHelp: "请先在 LM Studio 的 Developer 页面启动服务。可填写 http://localhost:1234，保存时会自动补全 /v1。",
+    openaiEndpoint: "请求地址固定为 https://api.openai.com/v1",
+    openaiDirectWarning: "个人自用模式：API Key 会保存在当前浏览器本地。直连浏览器扩展存在密钥暴露风险，请使用独立且受限额的 Key。",
+    saveLlm: "保存",
+    testLlm: "测试连接",
+    testingLlm: "测试中…",
+    llmTestSuccess: "连接成功，模型可以正常响应",
+    llmTestFailed: "连接失败，请检查地址、模型和凭据",
+    incompleteLlm: "请填写有效的服务地址、模型 ID 和当前方式所需的凭据。",
     privacy: "数据与隐私",
     privacyDescription: "设置保存在当前浏览器本地，不依赖登录或网络。",
     version: "版本",
@@ -161,6 +221,27 @@ const OPTIONS_COPY: Record<ResolvedLocale, OptionsCopy> = {
       mint: { label: "Mint", description: "Fresh and light for concepts and definitions" },
       coral: { label: "Coral", description: "Stronger emphasis for important reminders" },
     },
+    llm: "Language model",
+    llmDescription: "Configure the model service used by AI understanding. Both methods connect directly from the extension.",
+    llmProvider: "Connection",
+    llmProviders: {
+      "lm-studio": { label: "LM Studio", description: "Connect to an OpenAI-compatible server on this computer or local network" },
+      openai: { label: "OpenAI", description: "Connect directly to an online OpenAI model with an API key" },
+    },
+    llmBaseUrl: "Server URL",
+    llmModel: "Model ID",
+    llmModelPlaceholder: "Enter the model ID reported by the service",
+    llmApiKey: "OpenAI API Key",
+    llmOptionalApiKey: "Access token (optional)",
+    llmStudioHelp: "Start the server from LM Studio's Developer page first. You can enter http://localhost:1234; /v1 is added automatically.",
+    openaiEndpoint: "Requests use the fixed endpoint https://api.openai.com/v1",
+    openaiDirectWarning: "Personal-use mode: the API key is stored locally in this browser. Direct use from a browser extension risks exposing the key; use a separate key with a spending limit.",
+    saveLlm: "Save",
+    testLlm: "Test connection",
+    testingLlm: "Testing…",
+    llmTestSuccess: "Connected — the model responded successfully",
+    llmTestFailed: "Connection failed. Check the URL, model, and credentials",
+    incompleteLlm: "Enter a valid server URL, model ID, and the credentials required by the selected connection.",
     privacy: "Data & privacy",
     privacyDescription: "Settings stay in this browser and do not require an account or network connection.",
     version: "Version",
@@ -185,8 +266,9 @@ const POPUP_COPY: Record<ResolvedLocale, PopupCopy> = {
     authValidation: "请输入邮箱，密码至少 6 位。",
     signUpConfirmation: "注册成功，请按 Supabase 邮件完成验证后再登录。",
     quickActions: "快速操作",
-    selectionAction: "选中文本：三色高亮 + 批注 + 标签",
+    selectionAction: "首次划选：三色高亮 + 批注 + 标签；登录后显示 AI",
     existingHighlightAction: "点击已划线：调色盘 + 批注 + 标签 + 复制 + 删除",
+    learningSelectionAction: "高亮内再次划选：登录后显示 AI 学习工具条",
     localStorageAction: "数据保存到 Chrome IndexedDB",
     updating: "正在更新……",
     restoreSite: "恢复此网站划线",
@@ -223,8 +305,9 @@ const POPUP_COPY: Record<ResolvedLocale, PopupCopy> = {
     authValidation: "Enter an email and a password with at least 6 characters.",
     signUpConfirmation: "Account created. Verify your email with Supabase, then sign in.",
     quickActions: "Quick actions",
-    selectionAction: "Select text: three colors + note + tags",
+    selectionAction: "First selection: colors + note + tags; AI appears when signed in",
     existingHighlightAction: "Click a highlight: color + note + tags + copy + delete",
+    learningSelectionAction: "Select inside a highlight: AI learning toolbar when signed in",
     localStorageAction: "Data is stored in Chrome IndexedDB",
     updating: "Updating…",
     restoreSite: "Enable highlights on this site",
@@ -249,6 +332,7 @@ const POPUP_COPY: Record<ResolvedLocale, PopupCopy> = {
 const CONTENT_COPY: Record<ResolvedLocale, ContentCopy> = {
   "zh-CN": {
     colors: { gold: "暖黄", mint: "薄荷", coral: "珊瑚" },
+    aiUnderstanding: "AI 理解",
     note: "批注",
     tags: "标签",
     changeColor: "修改颜色",
@@ -282,9 +366,29 @@ const CONTENT_COPY: Record<ResolvedLocale, ContentCopy> = {
     tagsPlaceholder: "输入标签，如 AI/Agent，测试/用例设计",
     tagSeparator: "，",
     save: "保存",
+    aiLoading: "正在理解这段内容…",
+    aiTitle: "AI 轻解释",
+    aiSummaryLabel: "一句话解释",
+    aiContextLabel: "在这里的意思",
+    aiExample: "举个栗子🌰",
+    aiHideExample: "收起例子",
+    aiExampleLoading: "正在想栗子…",
+    aiExampleFailed: "例子生成失败，再试一次",
+    aiAppendNote: "补充到批注",
+    aiAppendCreatesHighlight: "补充时会同时创建一条高亮",
+    aiAppending: "补充中…",
+    aiAppended: "已补充",
+    aiAppendUnavailable: "选区跨越多条高亮，暂时无法补充到批注。",
+    aiThoughtCard: "思考卡片",
+    aiThoughtCardLater: "下一步接入划线侧栏",
+    aiFailed: "理解失败",
+    aiRetry: "重试",
+    aiClose: "关闭",
+    aiError: getZhAiError,
   },
   en: {
     colors: { gold: "Warm Gold", mint: "Mint", coral: "Coral" },
+    aiUnderstanding: "Understand with AI",
     note: "Note",
     tags: "Tags",
     changeColor: "Change color",
@@ -318,8 +422,47 @@ const CONTENT_COPY: Record<ResolvedLocale, ContentCopy> = {
     tagsPlaceholder: "Add tags, e.g. AI/Agent, testing/test design",
     tagSeparator: ", ",
     save: "Save",
+    aiLoading: "Understanding this selection…",
+    aiTitle: "Quick AI explanation",
+    aiSummaryLabel: "In one sentence",
+    aiContextLabel: "Meaning in context",
+    aiExample: "Give me an example 🌰",
+    aiHideExample: "Hide example",
+    aiExampleLoading: "Thinking of an example…",
+    aiExampleFailed: "Example failed — try again",
+    aiAppendNote: "Add to note",
+    aiAppendCreatesHighlight: "Adding this will also create a highlight",
+    aiAppending: "Adding…",
+    aiAppended: "Added",
+    aiAppendUnavailable: "This selection crosses multiple highlights, so it cannot be added to a note yet.",
+    aiThoughtCard: "Thinking card",
+    aiThoughtCardLater: "Coming next in the highlights sidebar",
+    aiFailed: "Could not explain this",
+    aiRetry: "Retry",
+    aiClose: "Close",
+    aiError: getEnAiError,
   },
 };
+
+function getZhAiError(code: string): string {
+  if (code === "AI_SIGN_IN_REQUIRED") return "登录状态已失效，请重新登录。";
+  if (code === "AI_MODEL_NOT_CONFIGURED") return "请先在设置中完成大模型配置。";
+  if (code === "AI_REQUEST_TIMEOUT") return "模型响应超时，请重试。";
+  if (code === "AI_INVALID_RESPONSE") return "模型返回的内容无法识别，请重试。";
+  if (code.startsWith("AI_NOTE_")) return "批注保存失败，请重试。";
+  if (code.startsWith("AI_REQUEST_FAILED:")) return `模型请求失败（${code.split(":")[1]}）。`;
+  return "暂时无法连接模型，请检查配置后重试。";
+}
+
+function getEnAiError(code: string): string {
+  if (code === "AI_SIGN_IN_REQUIRED") return "Your session has expired. Please sign in again.";
+  if (code === "AI_MODEL_NOT_CONFIGURED") return "Complete the model setup in Settings first.";
+  if (code === "AI_REQUEST_TIMEOUT") return "The model timed out. Please retry.";
+  if (code === "AI_INVALID_RESPONSE") return "The model returned an unreadable response. Please retry.";
+  if (code.startsWith("AI_NOTE_")) return "The note could not be saved. Please retry.";
+  if (code.startsWith("AI_REQUEST_FAILED:")) return `The model request failed (${code.split(":")[1]}).`;
+  return "The model could not be reached. Check your configuration and retry.";
+}
 
 export function resolveInterfaceLocale(
   preference: InterfaceLanguage,

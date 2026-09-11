@@ -1,5 +1,7 @@
 import type { HighlightRecord, PageRecord } from "./types";
 
+export const AI_AUTH_STATE_STORAGE_KEY = "liucai.ai.signedIn";
+
 export type PageStatusRequest = { type: "LIUCAI_GET_PAGE_STATUS" };
 export type SetSiteDisabledRequest = { type: "LIUCAI_SET_SITE_DISABLED"; disabled: boolean };
 
@@ -18,6 +20,40 @@ export interface SyncStatus {
   syncing: boolean;
   lastSyncedAt?: string;
   error?: string;
+}
+
+export interface AiExplanation {
+  concept: string;
+  summary: string;
+  contextualMeaning: string;
+}
+
+export interface AiExample {
+  example: string;
+}
+
+export interface AiExplainRequest {
+  type: "LIUCAI_AI_EXPLAIN";
+  selectedText: string;
+  contextText: string;
+  locale: "zh-CN" | "en";
+}
+
+export interface AiExampleRequest {
+  type: "LIUCAI_AI_EXAMPLE";
+  selectedText: string;
+  contextText: string;
+  concept: string;
+  locale: "zh-CN" | "en";
+}
+
+export interface AiTestConnectionRequest {
+  type: "LIUCAI_AI_TEST_CONNECTION";
+  connection: {
+    baseUrl: string;
+    model: string;
+    apiKey: string;
+  };
 }
 
 export interface PageStatus {
@@ -103,4 +139,47 @@ export function isSyncRequest(message: unknown): message is SyncRequest {
     return typeof request.email === "string" && typeof request.password === "string";
   }
   return true;
+}
+
+export function isAiExplainRequest(message: unknown): message is AiExplainRequest {
+  if (typeof message !== "object" || message === null) return false;
+  const request = message as Partial<AiExplainRequest>;
+  return request.type === "LIUCAI_AI_EXPLAIN"
+    && typeof request.selectedText === "string"
+    && request.selectedText.trim().length > 0
+    && request.selectedText.length <= 1500
+    && typeof request.contextText === "string"
+    && request.contextText.length <= 2500
+    && (request.locale === "zh-CN" || request.locale === "en");
+}
+
+export function isAiExampleRequest(message: unknown): message is AiExampleRequest {
+  if (typeof message !== "object" || message === null) return false;
+  const request = message as Partial<AiExampleRequest>;
+  return request.type === "LIUCAI_AI_EXAMPLE"
+    && typeof request.selectedText === "string"
+    && request.selectedText.trim().length > 0
+    && request.selectedText.length <= 1500
+    && typeof request.contextText === "string"
+    && request.contextText.length <= 2500
+    && typeof request.concept === "string"
+    && request.concept.trim().length > 0
+    && request.concept.length <= 120
+    && (request.locale === "zh-CN" || request.locale === "en");
+}
+
+export function isAiTestConnectionRequest(message: unknown): message is AiTestConnectionRequest {
+  if (typeof message !== "object" || message === null) return false;
+  const request = message as Partial<AiTestConnectionRequest>;
+  const connection = request.connection;
+  return request.type === "LIUCAI_AI_TEST_CONNECTION"
+    && typeof connection === "object"
+    && connection !== null
+    && typeof connection.baseUrl === "string"
+    && connection.baseUrl.length <= 2048
+    && typeof connection.model === "string"
+    && connection.model.trim().length > 0
+    && connection.model.length <= 300
+    && typeof connection.apiKey === "string"
+    && connection.apiKey.length <= 1000;
 }

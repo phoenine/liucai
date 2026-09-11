@@ -1,11 +1,63 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  isAiExplainRequest,
+  isAiExampleRequest,
+  isAiTestConnectionRequest,
   isPageStatusRequest,
   isSetSiteDisabledRequest,
   isStorageRequest,
   isSyncRequest,
 } from "../src/messages.ts";
+
+test("validates bounded AI explanation requests", () => {
+  assert.equal(isAiExplainRequest({
+    type: "LIUCAI_AI_EXPLAIN",
+    selectedText: "retrieval augmented generation",
+    contextText: "A nearby paragraph",
+    locale: "en",
+  }), true);
+  assert.equal(isAiExplainRequest({
+    type: "LIUCAI_AI_EXPLAIN",
+    selectedText: " ",
+    contextText: "context",
+    locale: "zh-CN",
+  }), false);
+  assert.equal(isAiExplainRequest({
+    type: "LIUCAI_AI_EXPLAIN",
+    selectedText: "term",
+    contextText: "context",
+    locale: "fr",
+  }), false);
+});
+
+test("validates follow-up example requests", () => {
+  assert.equal(isAiExampleRequest({
+    type: "LIUCAI_AI_EXAMPLE",
+    selectedText: "RAG",
+    contextText: "RAG is used here.",
+    concept: "Retrieval augmented generation",
+    locale: "en",
+  }), true);
+  assert.equal(isAiExampleRequest({
+    type: "LIUCAI_AI_EXAMPLE",
+    selectedText: "RAG",
+    contextText: "context",
+    concept: "",
+    locale: "en",
+  }), false);
+});
+
+test("validates bounded AI connection tests", () => {
+  assert.equal(isAiTestConnectionRequest({
+    type: "LIUCAI_AI_TEST_CONNECTION",
+    connection: { baseUrl: "http://localhost:1234/v1", model: "local", apiKey: "" },
+  }), true);
+  assert.equal(isAiTestConnectionRequest({
+    type: "LIUCAI_AI_TEST_CONNECTION",
+    connection: { baseUrl: "http://localhost:1234/v1", model: "", apiKey: "" },
+  }), false);
+});
 
 test("recognizes a page status request", () => {
   assert.equal(isPageStatusRequest({ type: "LIUCAI_GET_PAGE_STATUS" }), true);
