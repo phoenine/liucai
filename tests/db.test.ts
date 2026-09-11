@@ -251,6 +251,30 @@ test("binds a local database to one cloud account", async () => {
   );
 });
 
+test("first account binding queues a complete page-first bootstrap exactly once", async () => {
+  const page = await storage.upsertPage(
+    "https://example.com/article",
+    "https://example.com/article",
+    "Historical page",
+  );
+  const highlight = createHighlight(page.id);
+  await storage.addHighlight(highlight);
+
+  await storage.db.outbox.clear();
+  await storage.putHighlight(highlight);
+
+  await storage.bindLocalDatabaseToUser("user-a");
+
+  const firstBatch = await storage.getOutboxBatch();
+  assert.deepEqual(firstBatch.map((mutation) => mutation.entityType), ["page", "highlight"]);
+  assert.equal(firstBatch.filter((mutation) => mutation.entityId === page.id).length, 1);
+  assert.equal(firstBatch.filter((mutation) => mutation.entityId === highlight.id).length, 1);
+  assert.equal(await storage.getSyncCursor("user-a"), 0);
+
+  await storage.bindLocalDatabaseToUser("user-a");
+  assert.equal(await storage.db.outbox.count(), 2);
+});
+
 function createHighlight(pageId: string): HighlightRecord {
   return {
     id: "highlight-1",

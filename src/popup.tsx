@@ -138,7 +138,9 @@ function PopupApp() {
 
       <section className="lc-popup__card lc-popup__sync">
         <h2>{copy.cloudSync}</h2>
-        {syncStatus?.signedIn ? (
+        {syncStatus === null ? (
+          <p className="lc-popup__muted">{copy.checkingSync}</p>
+        ) : syncStatus.signedIn ? (
           <div>
             <div className="lc-popup__sync-row">
               <div>
@@ -156,7 +158,7 @@ function PopupApp() {
               </button>
             </div>
           </div>
-        ) : syncStatus?.configured === false ? (
+        ) : syncStatus.configured === false ? (
           <p className="lc-popup__muted">{copy.supabaseNotConfigured}</p>
         ) : (
           <form onSubmit={(event) => { event.preventDefault(); void submitAuth("sign-in"); }}>
