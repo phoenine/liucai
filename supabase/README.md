@@ -41,5 +41,16 @@ or secret API key for the database password. Never commit credentials to this fo
 - Clients cannot directly insert, update, or delete sync tables.
 - Mutations are accepted only through `apply_sync_batch`, which derives `user_id`
   from `auth.uid()` and ignores any user identifier supplied in a payload.
+- Highlight delete mutations retain one minimal row per highlight in
+  `highlight_tombstones`, append a durable delete event to `sync_changes`, and
+  physically remove the business row from `highlights`.
+- A stale upsert for a tombstoned highlight is acknowledged but converted into
+  a fresh delete event, so an offline device cannot resurrect deleted content
+  or retry the stale mutation forever.
+- `sync_changes` keeps only the latest snapshot per user entity, and highlight
+  deletion snapshots contain only `id` and `deletedAt`.
+- `sync_mutations` retains a rolling 180-day idempotency window.
+- Page deletion is explicitly unsupported while pages remain parent containers
+  for highlights.
 - The function is `security definer` with an empty search path and explicit schema
   qualification.

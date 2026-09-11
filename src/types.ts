@@ -32,6 +32,11 @@ export interface HighlightRecord {
   deletedAt?: string;
 }
 
+export interface HighlightDeletePayload {
+  id: string;
+  deletedAt: string;
+}
+
 export type SyncEntityType = "page" | "highlight";
 export type SyncOperation = "upsert" | "delete";
 
@@ -61,7 +66,7 @@ export interface RemoteChange {
   entityId: string;
   operation: SyncOperation;
   revision: number;
-  payload: PageRecord | HighlightRecord;
+  payload: PageRecord | HighlightRecord | HighlightDeletePayload;
 }
 
 export interface SyncBatchResult {

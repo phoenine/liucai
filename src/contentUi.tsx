@@ -1,5 +1,17 @@
-import { type ReactNode, useState } from "react";
+import {
+  CopyIcon,
+  DownloadSimpleIcon,
+  ListBulletsIcon,
+  NotePencilIcon,
+  PaletteIcon,
+  SparkleIcon,
+  TagIcon,
+  TrashIcon,
+  XIcon,
+} from "@phosphor-icons/react";
+import { type ReactNode, useEffect, useState } from "react";
 import type { ContentCopy } from "./localization";
+import type { AiExplanation } from "./messages";
 import { continueNoteList, parseNoteBlocks } from "./noteFormat";
 import {
   nextDeleteState,
@@ -23,6 +35,7 @@ export function SelectionToolbar(props: {
   onColor: (color: HighlightColor) => void;
   onNote: () => void;
   onTags: () => void;
+  onAi?: () => void;
 }) {
   return (
     <>
@@ -35,9 +48,159 @@ export function SelectionToolbar(props: {
         />
       ))}
       <span className="liucai-toolbar-divider" />
-      <IconButton kind="note" label={props.copy.note} onClick={props.onNote}>{icons.note}</IconButton>
-      <IconButton kind="tag" label={props.copy.tags} onClick={props.onTags}>{icons.tag}</IconButton>
+      <IconButton kind="note" label={props.copy.note} onClick={props.onNote}>
+        <NotePencilIcon aria-hidden weight="regular" />
+      </IconButton>
+      <IconButton kind="tag" label={props.copy.tags} onClick={props.onTags}>
+        <TagIcon aria-hidden weight="regular" />
+      </IconButton>
+      {props.onAi ? (
+        <IconButton kind="ai" label={props.copy.aiUnderstanding} onClick={props.onAi}>
+          <SparkleIcon aria-hidden weight="regular" />
+        </IconButton>
+      ) : null}
     </>
+  );
+}
+
+export function LearningToolbar(props: {
+  copy: ContentCopy;
+  onAi: () => void;
+}) {
+  return (
+    <IconButton kind="ai" label={props.copy.aiUnderstanding} onClick={props.onAi}>
+      <SparkleIcon aria-hidden weight="regular" />
+    </IconButton>
+  );
+}
+
+export type AiExplanationCardState =
+  | { status: "loading" }
+  | { status: "error"; error: string }
+  | { status: "success"; explanation: AiExplanation };
+
+export function AiExplanationCard(props: {
+  copy: ContentCopy;
+  state: AiExplanationCardState;
+  canAppend: boolean;
+  createsHighlight: boolean;
+  onLoadExample: () => Promise<string>;
+  onAppend: (example?: string) => Promise<void>;
+  onRetry: () => void;
+  onClose: () => void;
+}) {
+  const [exampleOpen, setExampleOpen] = useState(false);
+  const [example, setExample] = useState("");
+  const [exampleStatus, setExampleStatus] = useState<"idle" | "loading" | "failed">("idle");
+  const [appendStatus, setAppendStatus] = useState<"idle" | "saving" | "saved" | "failed">("idle");
+
+  useEffect(() => {
+    setExampleOpen(false);
+    setExample("");
+    setExampleStatus("idle");
+    setAppendStatus("idle");
+  }, [props.state.status === "success" ? props.state.explanation : props.state.status]);
+
+  const append = (): void => {
+    setAppendStatus("saving");
+    void props.onAppend(example || undefined)
+      .then(() => setAppendStatus("saved"))
+      .catch(() => setAppendStatus("failed"));
+  };
+
+  const toggleExample = (): void => {
+    if (example) {
+      setExampleOpen((open) => !open);
+      return;
+    }
+    if (exampleStatus === "loading") return;
+    setExampleStatus("loading");
+    void props.onLoadExample()
+      .then((value) => {
+        setExample(value);
+        setExampleOpen(true);
+        setExampleStatus("idle");
+      })
+      .catch(() => setExampleStatus("failed"));
+  };
+
+  return (
+    <section className="liucai-ai-card" aria-live="polite">
+      <header className="liucai-ai-card__header">
+        <div className="liucai-ai-card__title">
+          <SparkleIcon aria-hidden weight="regular" />
+          <span>{props.copy.aiTitle}</span>
+        </div>
+        <button className="liucai-ai-card__close" title={props.copy.aiClose} onClick={props.onClose}>
+          <XIcon aria-hidden weight="regular" />
+        </button>
+      </header>
+
+      {props.state.status === "loading" ? (
+        <div className="liucai-ai-card__loading">
+          <span className="liucai-ai-card__spinner" />
+          {props.copy.aiLoading}
+        </div>
+      ) : null}
+
+      {props.state.status === "error" ? (
+        <div className="liucai-ai-card__error">
+          <strong>{props.copy.aiFailed}</strong>
+          <span>{props.copy.aiError(props.state.error)}</span>
+          <button data-action="secondary" onClick={props.onRetry}>{props.copy.aiRetry}</button>
+        </div>
+      ) : null}
+
+      {props.state.status === "success" ? (
+        <>
+          <h3>{props.state.explanation.concept}</h3>
+          <div className="liucai-ai-card__section">
+            <span>{props.copy.aiSummaryLabel}</span>
+            <p>{props.state.explanation.summary}</p>
+          </div>
+          <div className="liucai-ai-card__section">
+            <span>{props.copy.aiContextLabel}</span>
+            <p>{props.state.explanation.contextualMeaning}</p>
+          </div>
+          {exampleOpen ? (
+            <div className="liucai-ai-card__example">{example}</div>
+          ) : null}
+          {!props.canAppend ? (
+            <p className="liucai-ai-card__hint is-warning">{props.copy.aiAppendUnavailable}</p>
+          ) : props.createsHighlight ? (
+            <p className="liucai-ai-card__hint">{props.copy.aiAppendCreatesHighlight}</p>
+          ) : null}
+          <div className="liucai-ai-card__actions">
+            <button data-action="secondary" onClick={toggleExample} disabled={exampleStatus === "loading"}>
+              {exampleStatus === "loading"
+                ? props.copy.aiExampleLoading
+                : exampleStatus === "failed"
+                  ? props.copy.aiExampleFailed
+                  : exampleOpen
+                    ? props.copy.aiHideExample
+                    : props.copy.aiExample}
+            </button>
+            <button
+              data-action="primary"
+              disabled={!props.canAppend || appendStatus === "saving" || appendStatus === "saved"}
+              onClick={append}
+            >
+              {appendStatus === "saving"
+                ? props.copy.aiAppending
+                : appendStatus === "saved"
+                  ? props.copy.aiAppended
+                  : props.copy.aiAppendNote}
+            </button>
+            <button data-action="secondary" disabled title={props.copy.aiThoughtCardLater}>
+              {props.copy.aiThoughtCard}
+            </button>
+          </div>
+          {appendStatus === "failed" ? (
+            <p className="liucai-ai-card__hint is-warning">{props.copy.aiError("AI_NOTE_SAVE_FAILED")}</p>
+          ) : null}
+        </>
+      ) : null}
+    </section>
   );
 }
 
@@ -60,10 +223,14 @@ export function ExistingHighlightToolbar(props: {
         label={props.copy.changeColor}
         onClick={() => setPaletteOpen((open) => !open)}
       >
-        {icons.palette}
+        <PaletteIcon aria-hidden weight="regular" />
       </IconButton>
-      <IconButton kind="note" label={props.copy.note} onClick={props.onNote}>{icons.note}</IconButton>
-      <IconButton kind="tag" label={props.copy.tags} onClick={props.onTags}>{icons.tag}</IconButton>
+      <IconButton kind="note" label={props.copy.note} onClick={props.onNote}>
+        <NotePencilIcon aria-hidden weight="regular" />
+      </IconButton>
+      <IconButton kind="tag" label={props.copy.tags} onClick={props.onTags}>
+        <TagIcon aria-hidden weight="regular" />
+      </IconButton>
       <IconButton
         kind={`copy${copied ? " is-copied" : ""}`}
         label={copied ? props.copy.copied : props.copy.copyExcerpt}
@@ -73,9 +240,11 @@ export function ExistingHighlightToolbar(props: {
           window.setTimeout(() => setCopied(false), 900);
         }}
       >
-        {icons.copy}
+        <CopyIcon aria-hidden weight="regular" />
       </IconButton>
-      <IconButton kind="delete" label={props.copy.delete} onClick={props.onDelete}>{icons.delete}</IconButton>
+      <IconButton kind="delete" label={props.copy.delete} onClick={props.onDelete}>
+        <TrashIcon aria-hidden weight="regular" />
+      </IconButton>
       {paletteOpen ? (
         <div className="liucai-palette-popout">
           {COLORS.map((item) => (
@@ -104,7 +273,9 @@ export function MiniSidebarLauncher(props: {
       title={props.copy.sidebarLabel}
       onClick={props.onToggle}
     >
-      <span className="liucai-mini-sidebar__icon">{icons.list}</span>
+      <span className="liucai-mini-sidebar__icon">
+        <ListBulletsIcon aria-hidden weight="regular" />
+      </span>
       <span className="liucai-mini-sidebar__count">{props.count}</span>
     </button>
   );
@@ -144,7 +315,9 @@ export function HighlightSidebar(props: {
           <h2>{props.copy.sidebarTitle}</h2>
           <span className="liucai-sidebar__count">{props.copy.highlightCount(props.records.length)}</span>
         </div>
-        <button className="liucai-sidebar__close" title={props.copy.collapse} onClick={props.onClose}>{icons.close}</button>
+        <button className="liucai-sidebar__close" title={props.copy.collapse} onClick={props.onClose}>
+          <XIcon aria-hidden weight="regular" />
+        </button>
       </header>
       <div
         className="liucai-sidebar__page-title"
@@ -164,7 +337,7 @@ export function HighlightSidebar(props: {
           onClick={handleExport}
           type="button"
         >
-          {icons.download}
+          <DownloadSimpleIcon aria-hidden weight="regular" />
           <span>{exportLabel}</span>
         </button>
       </div>
@@ -425,40 +598,3 @@ export function EditorPopover(props: {
     </>
   );
 }
-
-const iconProps = {
-  viewBox: "0 0 24 24",
-  fill: "none",
-  stroke: "currentColor",
-  strokeWidth: 2,
-  strokeLinecap: "round" as const,
-  strokeLinejoin: "round" as const,
-  "aria-hidden": true,
-};
-
-const icons = {
-  note: (
-    <svg {...iconProps}><path d="M12 20h9" /><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" /></svg>
-  ),
-  tag: (
-    <svg {...iconProps}><path d="M20.6 13.1 13.1 20.6a2 2 0 0 1-2.8 0L3 13.3V3h10.3l7.3 7.3a2 2 0 0 1 0 2.8Z" /><circle cx="7.5" cy="7.5" r="1" /></svg>
-  ),
-  delete: (
-    <svg {...iconProps}><path d="M3 6h18" /><path d="M8 6V4h8v2" /><path d="M19 6l-1 14H6L5 6" /><path d="M10 11v5" /><path d="M14 11v5" /></svg>
-  ),
-  copy: (
-    <svg {...iconProps}><rect x="9" y="9" width="13" height="13" rx="2" /><rect x="2" y="2" width="13" height="13" rx="2" /></svg>
-  ),
-  palette: (
-    <svg {...iconProps}><circle cx="13.5" cy="6.5" r=".5" fill="currentColor" /><circle cx="17.5" cy="10.5" r=".5" fill="currentColor" /><circle cx="8.5" cy="7.5" r=".5" fill="currentColor" /><circle cx="6.5" cy="12.5" r=".5" fill="currentColor" /><path d="M12 22a10 10 0 1 1 10-10 3.5 3.5 0 0 1-3.5 3.5h-1.2a2 2 0 0 0-1.4 3.4l.3.3A1.7 1.7 0 0 1 15 22Z" /></svg>
-  ),
-  list: (
-    <svg {...iconProps}><path d="M8 6h13" /><path d="M8 12h13" /><path d="M8 18h13" /><path d="M3 6h.01" /><path d="M3 12h.01" /><path d="M3 18h.01" /></svg>
-  ),
-  close: (
-    <svg {...iconProps}><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg>
-  ),
-  download: (
-    <svg {...iconProps}><path d="M12 3v12" /><path d="m7 10 5 5 5-5" /><path d="M5 21h14" /></svg>
-  ),
-};

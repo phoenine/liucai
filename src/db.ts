@@ -1,6 +1,7 @@
 import Dexie, { type Table } from "dexie";
 import { generateUuid } from "./id";
 import type {
+  HighlightDeletePayload,
   HighlightRecord,
   OutboxMutation,
   PageRecord,
@@ -214,6 +215,8 @@ export async function applySyncBatch(userId: string, result: SyncBatchResult): P
 
       if (change.entityType === "page") {
         await applyRemotePage(change.payload as PageRecord);
+      } else if (change.operation === "delete") {
+        await applyRemoteHighlightDelete(change.entityId, change.payload as HighlightDeletePayload);
       } else {
         await applyRemoteHighlight(change.payload as HighlightRecord);
       }
@@ -231,7 +234,7 @@ export async function applySyncBatch(userId: string, result: SyncBatchResult): P
 async function hasPendingLocalChange(
   entityType: SyncEntityType,
   entityId: string,
-  payload: PageRecord | HighlightRecord,
+  payload: PageRecord | HighlightRecord | HighlightDeletePayload,
 ): Promise<boolean> {
   const direct = await db.outbox
     .where("[entityType+entityId]")
@@ -269,6 +272,18 @@ async function applyRemotePage(payload: PageRecord): Promise<void> {
 
 async function applyRemoteHighlight(payload: HighlightRecord): Promise<void> {
   await db.highlights.put(normalizeHighlightRecord(pickHighlightFields(payload)));
+}
+
+async function applyRemoteHighlightDelete(
+  id: string,
+  payload: HighlightDeletePayload,
+): Promise<void> {
+  const existing = await db.highlights.get(id);
+  if (!existing) return;
+  await db.highlights.put(normalizeHighlightRecord({
+    ...existing,
+    deletedAt: payload.deletedAt,
+  }));
 }
 
 function pickPageFields(payload: PageRecord): PageRecord {

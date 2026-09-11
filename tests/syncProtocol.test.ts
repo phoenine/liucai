@@ -75,3 +75,50 @@ test("rejects malformed remote records before they reach IndexedDB", () => {
     hasMore: false,
   }), /无效的高亮记录/);
 });
+
+test("accepts a minimal highlight deletion payload", () => {
+  const result = parseSyncBatchResult({
+    acknowledgedMutationIds: ["mutation-2"],
+    changes: [{
+      sequence: 5,
+      revision: 5,
+      entityType: "highlight",
+      entityId: "highlight-1",
+      operation: "delete",
+      payload: {
+        id: "highlight-1",
+        deletedAt: "2026-09-11T00:00:00Z",
+      },
+    }],
+    nextCursor: 5,
+    hasMore: false,
+  });
+
+  assert.deepEqual(result.changes[0].payload, {
+    id: "highlight-1",
+    deletedAt: "2026-09-11T00:00:00Z",
+  });
+});
+
+test("rejects the unsupported page deletion operation", () => {
+  assert.throws(() => parseSyncBatchResult({
+    acknowledgedMutationIds: [],
+    changes: [{
+      sequence: 6,
+      revision: 6,
+      entityType: "page",
+      entityId: "page-1",
+      operation: "delete",
+      payload: {
+        id: "page-1",
+        canonicalUrl: "https://example.com",
+        originalUrl: "https://example.com",
+        title: "Example",
+        createdAt: "2026-09-09T00:00:00Z",
+        updatedAt: "2026-09-09T01:00:00Z",
+      },
+    }],
+    nextCursor: 6,
+    hasMore: false,
+  }), /无效的变更记录/);
+});

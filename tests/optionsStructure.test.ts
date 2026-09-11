@@ -49,3 +49,41 @@ test("uses the configured default only for implicit note and tag highlights", as
   assert.match(controller, /createHighlight\(\s*this\.defaultAnnotationColor,\s*\{ openEditor: true, focus: "note" \}/);
   assert.match(controller, /createHighlight\(\s*this\.defaultAnnotationColor,\s*\{ openEditor: true, focus: "tags" \}/);
 });
+
+test("offers separate LM Studio and OpenAI direct connection settings", async () => {
+  const options = await readFile(new URL("../src/options.tsx", import.meta.url), "utf8");
+  const localization = await readFile(new URL("../src/localization.ts", import.meta.url), "utf8");
+
+  assert.match(options, /\["lm-studio", "openai"\]/);
+  assert.match(options, /loadLlmSettings/);
+  assert.match(options, /saveLlmSettings/);
+  assert.match(options, /type="password"/);
+  assert.match(options, /OPENAI_BASE_URL/);
+  assert.match(localization, /API Key 会保存在当前浏览器本地/);
+  assert.match(localization, /Direct use from a browser extension risks exposing the key/);
+});
+
+test("captures LLM input values before queued React state updates", async () => {
+  const options = await readFile(new URL("../src/options.tsx", import.meta.url), "utf8");
+
+  assert.doesNotMatch(
+    options,
+    /setLlmSettings\(\(current\) => \(\{[\s\S]{0,180}event\.currentTarget\.value/,
+  );
+  assert.equal(options.match(/const value = event\.currentTarget\.value;/g)?.length, 5);
+});
+
+test("offers save feedback, a real connection test, and reduced-motion press feedback", async () => {
+  const options = await readFile(new URL("../src/options.tsx", import.meta.url), "utf8");
+  const styles = await readFile(new URL("../src/options.css", import.meta.url), "utf8");
+  const localization = await readFile(new URL("../src/localization.ts", import.meta.url), "utf8");
+
+  assert.match(options, /LIUCAI_AI_TEST_CONNECTION/);
+  assert.match(options, /llmTestSuccess/);
+  assert.match(options, /saveTarget === "llm"/);
+  assert.match(localization, /saveLlm: "保存"/);
+  assert.match(localization, /testLlm: "测试连接"/);
+  assert.match(styles, /transform 140ms var\(--ease-out\)/);
+  assert.match(styles, /transform: scale\(0\.97\)/);
+  assert.match(styles, /@media \(prefers-reduced-motion: reduce\)/);
+});

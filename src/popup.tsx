@@ -192,6 +192,7 @@ function PopupApp() {
         <ul>
           <li>{copy.selectionAction}</li>
           <li>{copy.existingHighlightAction}</li>
+          <li>{copy.learningSelectionAction}</li>
           <li>{copy.localStorageAction}</li>
         </ul>
       </section>

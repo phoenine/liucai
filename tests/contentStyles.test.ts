@@ -60,6 +60,24 @@ test("styles sidebar action feedback and disabled states", async () => {
   assert.match(css, /button\[data-status="failed"\]\s*\{[^}]*color:\s*#dc2626;/s);
 });
 
+test("keeps the AI toolbar button background consistent with other actions", async () => {
+  const css = await readFile(new URL("../public/content.css", import.meta.url), "utf8");
+  const aiRule = css.match(/\.liucai-icon-button--ai\s*\{[^}]*\}/s)?.[0];
+
+  assert.ok(aiRule);
+  assert.match(aiRule, /background:\s*#ffffff;/i);
+  assert.match(aiRule, /color:\s*#475569;/i);
+  assert.doesNotMatch(aiRule, /#7c3aed|#6d28d9/i);
+});
+
+test("uses the sourced Phosphor chat icon without adding a DOM component", async () => {
+  const css = await readFile(new URL("../public/content.css", import.meta.url), "utf8");
+
+  assert.match(css, /Phosphor Icons: ChatCircleDots, regular weight/);
+  assert.match(css, /data:image\/svg\+xml/i);
+  assert.match(css, /viewBox='0 0 256 256'/);
+});
+
 test("wraps unbroken highlight and note text inside its container", async () => {
   const css = await readFile(new URL("../public/content.css", import.meta.url), "utf8");
   const textRule = css.match(/\.liucai-sidebar-item__text\s*\{[^}]*\}/s)?.[0];
