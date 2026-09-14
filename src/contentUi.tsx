@@ -86,7 +86,6 @@ export function AiExplanationCard(props: {
   copy: ContentCopy;
   state: AiExplanationCardState;
   canAppend: boolean;
-  createsHighlight: boolean;
   onLoadExample: () => Promise<string>;
   onAppend: (example?: string) => Promise<void>;
   onRetry: () => void;
@@ -165,8 +164,6 @@ export function AiExplanationCard(props: {
           ) : null}
           {!props.canAppend ? (
             <p className="liucai-ai-card__hint is-warning">{props.copy.aiAppendUnavailable}</p>
-          ) : props.createsHighlight ? (
-            <p className="liucai-ai-card__hint">{props.copy.aiAppendCreatesHighlight}</p>
           ) : null}
           <div className="liucai-ai-card__actions">
             <button data-action="secondary" onClick={toggleExample} disabled={exampleStatus === "loading"}>

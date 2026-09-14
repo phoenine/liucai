@@ -130,7 +130,6 @@ export interface ContentCopy {
   aiExampleLoading: string;
   aiExampleFailed: string;
   aiAppendNote: string;
-  aiAppendCreatesHighlight: string;
   aiAppending: string;
   aiAppended: string;
   aiAppendUnavailable: string;
@@ -378,7 +377,6 @@ const CONTENT_COPY: Record<ResolvedLocale, ContentCopy> = {
     aiExampleLoading: "正在想栗子…",
     aiExampleFailed: "例子生成失败，再试一次",
     aiAppendNote: "补充到批注",
-    aiAppendCreatesHighlight: "补充时会同时创建一条高亮",
     aiAppending: "补充中…",
     aiAppended: "已补充",
     aiAppendUnavailable: "选区跨越多条高亮，暂时无法补充到批注。",
@@ -434,7 +432,6 @@ const CONTENT_COPY: Record<ResolvedLocale, ContentCopy> = {
     aiExampleLoading: "Thinking of an example…",
     aiExampleFailed: "Example failed — try again",
     aiAppendNote: "Add to note",
-    aiAppendCreatesHighlight: "Adding this will also create a highlight",
     aiAppending: "Adding…",
     aiAppended: "Added",
     aiAppendUnavailable: "This selection crosses multiple highlights, so it cannot be added to a note yet.",

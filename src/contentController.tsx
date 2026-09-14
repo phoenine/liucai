@@ -609,7 +609,6 @@ export class ContentController {
           copy={this.contentCopy}
           state={state}
           canAppend={highlightIds.length <= 1}
-          createsHighlight={highlightIds.length === 0}
           onLoadExample={async () => {
             if (!explanation) throw new Error("AI_EXPLANATION_MISSING");
             const modelRequestId = generateUuid();
