@@ -449,6 +449,7 @@ function getZhAiError(code: string): string {
   if (code === "AI_MODEL_NOT_CONFIGURED") return "请先在设置中完成大模型配置。";
   if (code === "AI_REQUEST_TIMEOUT") return "模型响应超时，请重试。";
   if (code === "AI_INVALID_RESPONSE") return "模型返回的内容无法识别，请重试。";
+  if (code === "AI_RESPONSE_INCOMPLETE") return "模型返回未完成，请重试或提高最大输出长度。";
   if (code.startsWith("AI_NOTE_")) return "批注保存失败，请重试。";
   if (code.startsWith("AI_REQUEST_FAILED:")) return `模型请求失败（${code.split(":")[1]}）。`;
   return "暂时无法连接模型，请检查配置后重试。";
@@ -459,6 +460,7 @@ function getEnAiError(code: string): string {
   if (code === "AI_MODEL_NOT_CONFIGURED") return "Complete the model setup in Settings first.";
   if (code === "AI_REQUEST_TIMEOUT") return "The model timed out. Please retry.";
   if (code === "AI_INVALID_RESPONSE") return "The model returned an unreadable response. Please retry.";
+  if (code === "AI_RESPONSE_INCOMPLETE") return "The model response was incomplete. Retry or increase the output limit.";
   if (code.startsWith("AI_NOTE_")) return "The note could not be saved. Please retry.";
   if (code.startsWith("AI_REQUEST_FAILED:")) return `The model request failed (${code.split(":")[1]}).`;
   return "The model could not be reached. Check your configuration and retry.";

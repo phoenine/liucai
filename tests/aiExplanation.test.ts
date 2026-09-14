@@ -296,15 +296,38 @@ test("rejects a reasoning-only example response with no final answer", async () 
   }), /AI_INVALID_RESPONSE/);
 });
 
-test("hard-limits light explanation length after model output", () => {
+test("preserves the complete explanation while limiting only the concept label", () => {
+  const completeExplanation = `${"文".repeat(150)}。这是完整结尾。`;
   const result = parseAiExplanation({
     output_text: JSON.stringify({
       concept: "一二三四五六七八九十一二三四五六七八九十一二三",
-      explanation: "文".repeat(150),
+      explanation: completeExplanation,
     }),
   }, "zh-CN");
   assert.equal(result.concept.length, AI_CONCEPT_LIMIT["zh-CN"]);
-  assert.equal(result.explanation.length, AI_EXPLANATION_LIMIT["zh-CN"]);
+  assert.equal(result.explanation, completeExplanation);
+  assert.ok(result.explanation.length > AI_EXPLANATION_LIMIT["zh-CN"]);
+});
+
+test("does not truncate long streamed light explanations", async () => {
+  const updates: string[] = [];
+  const first = "评审者智能体会检查内容并提供结构化反馈，";
+  const ending = `${"补充说明".repeat(30)}。这是完整结尾。`;
+  const result = await explainSelection({
+    type: "LIUCAI_AI_EXPLAIN",
+    requestId: "request-long-stream",
+    selectedText: "评审者智能体",
+    contextText: "它负责评估内容质量。",
+    locale: "zh-CN",
+  }, {
+    getSyncStatus: async () => ({ configured: true, signedIn: true, pendingCount: 0, syncing: false }),
+    getConnection: async () => ({ baseUrl: "http://localhost:1234/v1", model: "local", apiKey: "" }),
+    fetch: async () => streamedOutput([first, ending]),
+  }, undefined, (text) => updates.push(text));
+
+  assert.equal(updates.at(-1), first + ending);
+  assert.equal(result.explanation, first + ending);
+  assert.match(result.explanation, /这是完整结尾。$/);
 });
 
 test("connection test requires a real model response even when an unsupported endpoint returns 200", async () => {

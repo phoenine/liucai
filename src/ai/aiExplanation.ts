@@ -53,7 +53,7 @@ export async function explainSelection(
       stream: Boolean(onUpdate),
     });
     const outputText = await readResponseOutput(response, onUpdate
-      ? (text) => onUpdate(limitExplanationText(normalizeAiEmphasis(text), request.locale))
+      ? (text) => onUpdate(requireText(normalizeAiEmphasis(text)))
       : undefined);
     return parseAiExplanation({ output_text: outputText }, request.locale, request.selectedText);
   } catch (error) {
@@ -99,7 +99,7 @@ export async function generateExample(
       stream: Boolean(onUpdate),
     });
     const outputText = await readResponseOutput(response, onUpdate
-      ? (text) => onUpdate(requireFormattedText(normalizeAiEmphasis(text), 1000))
+      ? (text) => onUpdate(requireText(normalizeAiEmphasis(text)))
       : undefined);
     return parseAiExample({ output_text: outputText }, request.locale);
   } catch (error) {
@@ -134,7 +134,7 @@ export async function testAiConnection(
       signal: controller.signal,
     });
     if (!response.ok) throw new Error(`AI_REQUEST_FAILED:${response.status}`);
-    if (!extractResponseOutputText(await response.json()).trim()) throw new Error("AI_INVALID_RESPONSE");
+    if (!(await readResponseOutput(response)).trim()) throw new Error("AI_INVALID_RESPONSE");
   } catch (error) {
     if (controller.signal.aborted) throw new Error("AI_REQUEST_TIMEOUT");
     throw error;
@@ -159,12 +159,7 @@ export function parseAiExplanation(
       AI_CONCEPT_LIMIT["zh-CN"],
       AI_CONCEPT_LIMIT.en,
     ),
-    explanation: requireLimitedText(
-      normalizeAiEmphasis(parsed?.explanation ?? outputText),
-      locale,
-      AI_EXPLANATION_LIMIT["zh-CN"],
-      AI_EXPLANATION_LIMIT.en,
-    ),
+    explanation: requireText(normalizeAiEmphasis(parsed?.explanation ?? outputText)),
   };
 }
 
@@ -172,7 +167,7 @@ export function parseAiExample(
   value: unknown,
   _locale: AiExampleRequest["locale"] = "en",
 ): AiExample {
-  return { example: requireFormattedText(normalizeAiEmphasis(extractResponseOutputText(value)), 1000) };
+  return { example: requireText(normalizeAiEmphasis(extractResponseOutputText(value))) };
 }
 
 function buildInstructions(locale: AiExplainRequest["locale"]): string {
@@ -292,13 +287,9 @@ function requireLimitedText(
   return text.split(/\s+/).slice(0, maxEnglishWords).join(" ");
 }
 
-function limitExplanationText(value: unknown, locale: AiExplainRequest["locale"]): string {
-  return requireLimitedText(value, locale, AI_EXPLANATION_LIMIT["zh-CN"], AI_EXPLANATION_LIMIT.en);
-}
-
-function requireFormattedText(value: unknown, maxCharacters: number): string {
+function requireText(value: unknown): string {
   if (typeof value !== "string" || !value.trim()) throw new Error("AI_INVALID_RESPONSE");
-  return value.trim().slice(0, maxCharacters);
+  return value.trim();
 }
 
 function normalizeAiEmphasis(value: unknown): unknown {

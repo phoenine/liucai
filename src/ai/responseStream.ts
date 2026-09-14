@@ -6,7 +6,9 @@ export async function readResponseOutput(
 ): Promise<string> {
   const contentType = response.headers.get("content-type") ?? "";
   if (!onUpdate || !contentType.toLowerCase().includes("text/event-stream") || !response.body) {
-    const text = extractResponseOutputText(await response.json());
+    const payload: unknown = await response.json();
+    requireCompleteResponse(payload);
+    const text = extractResponseOutputText(payload);
     if (onUpdate && text) onUpdate(text);
     return text;
   }
@@ -46,8 +48,12 @@ export async function readResponseOutput(
       return;
     }
     if (eventType === "response.completed" && isRecord(payload.response)) {
+      requireCompleteResponse(payload.response);
       completedOutput = extractResponseOutputText(payload.response);
       return;
+    }
+    if (eventType === "response.incomplete") {
+      throw new Error("AI_RESPONSE_INCOMPLETE");
     }
     if (eventType === "error" || eventType === "response.failed") {
       throw new Error("AI_REQUEST_FAILED");
@@ -77,6 +83,12 @@ export async function readResponseOutput(
   const text = output || completedOutput;
   if (!output && text) onUpdate(text);
   return text;
+}
+
+function requireCompleteResponse(value: unknown): void {
+  if (isRecord(value) && value.status === "incomplete") {
+    throw new Error("AI_RESPONSE_INCOMPLETE");
+  }
 }
 
 export function extractResponseOutputText(value: unknown): string {

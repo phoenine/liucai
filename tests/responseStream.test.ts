@@ -48,3 +48,21 @@ test("falls back to a normal JSON response when streaming is unsupported", async
   assert.equal(await readResponseOutput(response, (text) => updates.push(text)), "普通回答");
   assert.deepEqual(updates, ["普通回答"]);
 });
+
+test("rejects incomplete responses instead of accepting partial output", async () => {
+  const jsonResponse = new Response(JSON.stringify({
+    status: "incomplete",
+    incomplete_details: { reason: "max_output_tokens" },
+    output_text: "未完成的半句话",
+  }), { headers: { "Content-Type": "application/json" } });
+  await assert.rejects(() => readResponseOutput(jsonResponse), /AI_RESPONSE_INCOMPLETE/);
+
+  const streamResponse = eventStream([
+    'event: response.output_text.delta\ndata: {"type":"response.output_text.delta","delta":"未完成"}\n\n',
+    `event: response.incomplete\ndata: ${JSON.stringify({
+      type: "response.incomplete",
+      response: { status: "incomplete", output_text: "未完成" },
+    })}\n\n`,
+  ]);
+  await assert.rejects(() => readResponseOutput(streamResponse, () => {}), /AI_RESPONSE_INCOMPLETE/);
+});
