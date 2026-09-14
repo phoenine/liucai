@@ -11,14 +11,14 @@ import type {
   SyncStateRecord,
 } from "./types";
 
-class LiucaiDatabase extends Dexie {
+export class LiucaiDatabase extends Dexie {
   pages!: Table<PageRecord, string>;
   highlights!: Table<HighlightRecord, string>;
   outbox!: Table<OutboxMutation, string>;
   syncState!: Table<SyncStateRecord, string>;
 
-  constructor() {
-    super("liucai");
+  constructor(name: string) {
+    super(name);
     this.version(1).stores({
       pages: "id, canonicalUrl, updatedAt, lastOpenedAt",
       highlights: "id, pageId, canonicalUrl, updatedAt, deletedAt",
@@ -44,15 +44,97 @@ class LiucaiDatabase extends Dexie {
   }
 }
 
-export const db = new LiucaiDatabase();
+const LEGACY_DATABASE_NAME = "liucai";
+const GUEST_DATABASE_NAME = "liucai-guest-v1";
+const ACCOUNT_DATABASE_PREFIX = "liucai-account-v1:";
+const LEGACY_MIGRATION_KEY = "migration:legacy-database:v1";
+
+const databases = new Map<string, LiucaiDatabase>();
+let activeUserId: string | null = null;
+let activationSequence = 0;
+let legacyMigration: Promise<void> | null = null;
+
+/** Live binding retained for existing direct consumers and database tests. */
+export let db = getOrCreateDatabase(GUEST_DATABASE_NAME);
+
+export async function activateLocalDatabase(userId: string | null): Promise<LiucaiDatabase> {
+  const sequence = ++activationSequence;
+  await ensureLegacyMigration();
+  const database = getOrCreateDatabase(databaseName(userId));
+  await database.open();
+  if (sequence === activationSequence) {
+    db = database;
+    activeUserId = userId;
+  }
+  return database;
+}
+
+export function isActiveLocalDatabase(database: LiucaiDatabase, userId: string): boolean {
+  return db === database && activeUserId === userId;
+}
+
+async function ensureLegacyMigration(): Promise<void> {
+  legacyMigration ??= migrateLegacyDatabase().catch((error) => {
+    legacyMigration = null;
+    throw error;
+  });
+  return legacyMigration;
+}
+
+async function migrateLegacyDatabase(): Promise<void> {
+  if (!(await Dexie.exists(LEGACY_DATABASE_NAME))) return;
+
+  const legacy = new LiucaiDatabase(LEGACY_DATABASE_NAME);
+  try {
+    await legacy.open();
+    const binding = await legacy.syncState.get("bound-account");
+    const targetUserId = binding?.userId ?? null;
+    const target = getOrCreateDatabase(databaseName(targetUserId));
+    await target.open();
+    if (await target.syncState.get(LEGACY_MIGRATION_KEY)) return;
+
+    const [pages, highlights, outbox, syncState] = await Promise.all([
+      legacy.pages.toArray(),
+      legacy.highlights.toArray(),
+      legacy.outbox.toArray(),
+      legacy.syncState.toArray(),
+    ]);
+    await target.transaction("rw", target.pages, target.highlights, target.outbox, target.syncState, async () => {
+      await target.pages.bulkPut(pages);
+      await target.highlights.bulkPut(highlights);
+      await target.outbox.bulkPut(outbox);
+      await target.syncState.bulkPut(syncState);
+      await target.syncState.put({ key: LEGACY_MIGRATION_KEY, cursor: 0, userId: targetUserId ?? undefined });
+    });
+  } finally {
+    legacy.close();
+  }
+}
+
+function databaseName(userId: string | null): string {
+  return userId ? `${ACCOUNT_DATABASE_PREFIX}${userId}` : GUEST_DATABASE_NAME;
+}
+
+function getOrCreateDatabase(name: string): LiucaiDatabase {
+  const existing = databases.get(name);
+  if (existing) return existing;
+  const database = new LiucaiDatabase(name);
+  databases.set(name, database);
+  return database;
+}
 
 /** Failures allowed before a mutation stops being retried in the ordinary batch. */
 const MAX_SYNC_ATTEMPTS = 8;
 
-export async function upsertPage(canonicalUrl: string, originalUrl: string, title: string): Promise<PageRecord> {
-  return db.transaction("rw", db.pages, db.outbox, async () => {
+export async function upsertPage(
+  canonicalUrl: string,
+  originalUrl: string,
+  title: string,
+  database: LiucaiDatabase = db,
+): Promise<PageRecord> {
+  return database.transaction("rw", database.pages, database.outbox, async () => {
     const now = new Date().toISOString();
-    const existing = await db.pages.where("canonicalUrl").equals(canonicalUrl).first();
+    const existing = await database.pages.where("canonicalUrl").equals(canonicalUrl).first();
 
     if (existing) {
       const changedForSync = existing.originalUrl !== originalUrl || (title && existing.title !== title);
@@ -63,9 +145,9 @@ export async function upsertPage(canonicalUrl: string, originalUrl: string, titl
         updatedAt: changedForSync ? now : existing.updatedAt,
         lastOpenedAt: now,
       };
-      await db.pages.put(updated);
+      await database.pages.put(updated);
       if (changedForSync) {
-        await enqueueSnapshot("page", updated);
+        await enqueueSnapshot("page", updated, database);
       }
       return updated;
     }
@@ -79,14 +161,17 @@ export async function upsertPage(canonicalUrl: string, originalUrl: string, titl
       updatedAt: now,
       lastOpenedAt: now,
     };
-    await db.pages.add(page);
-    await enqueueSnapshot("page", page);
+    await database.pages.add(page);
+    await enqueueSnapshot("page", page, database);
     return page;
   });
 }
 
-export async function getActiveHighlights(canonicalUrl: string): Promise<HighlightRecord[]> {
-  const records = await db.highlights.where("canonicalUrl").equals(canonicalUrl).toArray();
+export async function getActiveHighlights(
+  canonicalUrl: string,
+  database: LiucaiDatabase = db,
+): Promise<HighlightRecord[]> {
+  const records = await database.highlights.where("canonicalUrl").equals(canonicalUrl).toArray();
   return records
     .filter((record) => !record.deletedAt)
     .map(normalizeHighlightRecord)
@@ -101,26 +186,29 @@ export function normalizeHighlightRecord(record: HighlightRecord): HighlightReco
   };
 }
 
-export async function getHighlight(id: string): Promise<HighlightRecord | undefined> {
-  const record = await db.highlights.get(id);
+export async function getHighlight(
+  id: string,
+  database: LiucaiDatabase = db,
+): Promise<HighlightRecord | undefined> {
+  const record = await database.highlights.get(id);
   return record ? normalizeHighlightRecord(record) : undefined;
 }
 
-export async function addHighlight(record: HighlightRecord): Promise<void> {
+export async function addHighlight(record: HighlightRecord, database: LiucaiDatabase = db): Promise<void> {
   const normalized = normalizeHighlightRecord(record);
   assertNoteWithinLimit(normalized.note);
-  await db.transaction("rw", db.highlights, db.outbox, async () => {
-    await db.highlights.add(normalized);
-    await enqueueSnapshot("highlight", normalized);
+  await database.transaction("rw", database.highlights, database.outbox, async () => {
+    await database.highlights.add(normalized);
+    await enqueueSnapshot("highlight", normalized, database);
   });
 }
 
-export async function putHighlight(record: HighlightRecord): Promise<void> {
+export async function putHighlight(record: HighlightRecord, database: LiucaiDatabase = db): Promise<void> {
   const normalized = normalizeHighlightRecord(record);
   assertNoteWithinLimit(normalized.note);
-  await db.transaction("rw", db.highlights, db.outbox, async () => {
-    await db.highlights.put(normalized);
-    await enqueueSnapshot("highlight", normalized);
+  await database.transaction("rw", database.highlights, database.outbox, async () => {
+    await database.highlights.put(normalized);
+    await enqueueSnapshot("highlight", normalized, database);
   });
 }
 
@@ -133,9 +221,13 @@ export async function putHighlight(record: HighlightRecord): Promise<void> {
  * Mutations that keep failing are left out of the batch so one bad record cannot freeze the queue
  * for everything behind it; `resetOutboxRetries` (the user-visible "sync now") puts them back in.
  */
-export async function getOutboxBatch(limit = 100, now = new Date()): Promise<OutboxMutation[]> {
+export async function getOutboxBatch(
+  limit = 100,
+  now = new Date(),
+  database: LiucaiDatabase = db,
+): Promise<OutboxMutation[]> {
   const cutoff = now.getTime();
-  const records = await db.outbox.toArray();
+  const records = await database.outbox.toArray();
   return records
     .filter((record) => (record.retryCount ?? 0) < MAX_SYNC_ATTEMPTS)
     .filter((record) => !record.nextAttemptAt || Date.parse(record.nextAttemptAt) <= cutoff)
@@ -146,27 +238,31 @@ export async function getOutboxBatch(limit = 100, now = new Date()): Promise<Out
     .slice(0, limit);
 }
 
-export async function getOutboxCount(): Promise<number> {
-  return db.outbox.count();
+export async function getOutboxCount(database: LiucaiDatabase = db): Promise<number> {
+  return database.outbox.count();
 }
 
-export async function resetOutboxRetries(): Promise<void> {
-  await db.outbox.toCollection().modify((record) => {
+export async function resetOutboxRetries(database: LiucaiDatabase = db): Promise<void> {
+  await database.outbox.toCollection().modify((record) => {
     record.retryCount = 0;
     delete record.nextAttemptAt;
     delete record.lastError;
   });
 }
 
-export async function recordSyncFailure(mutationIds: string[], message: string): Promise<void> {
+export async function recordSyncFailure(
+  mutationIds: string[],
+  message: string,
+  database: LiucaiDatabase = db,
+): Promise<void> {
   const attemptedAt = Date.now();
-  await db.transaction("rw", db.outbox, async () => {
+  await database.transaction("rw", database.outbox, async () => {
     for (const mutationId of mutationIds) {
-      const record = await db.outbox.get(mutationId);
+      const record = await database.outbox.get(mutationId);
       if (!record) continue;
       const retryCount = record.retryCount + 1;
       const delayMs = Math.min(30 * 60_000, 30_000 * 2 ** Math.min(retryCount - 1, 6));
-      await db.outbox.update(mutationId, {
+      await database.outbox.update(mutationId, {
         retryCount,
         nextAttemptAt: new Date(attemptedAt + delayMs).toISOString(),
         lastError: message,
@@ -175,88 +271,111 @@ export async function recordSyncFailure(mutationIds: string[], message: string):
   });
 }
 
-export async function getSyncCursor(userId: string): Promise<number> {
-  return (await db.syncState.get(cursorKey(userId)))?.cursor ?? 0;
+export async function getSyncCursor(userId: string, database: LiucaiDatabase = db): Promise<number> {
+  return (await database.syncState.get(cursorKey(userId)))?.cursor ?? 0;
 }
 
-export async function getSyncState(userId: string): Promise<SyncStateRecord | undefined> {
-  return db.syncState.get(cursorKey(userId));
+export async function getSyncState(
+  userId: string,
+  database: LiucaiDatabase = db,
+): Promise<SyncStateRecord | undefined> {
+  return database.syncState.get(cursorKey(userId));
 }
 
-export async function bindLocalDatabaseToUser(userId: string): Promise<void> {
-  await db.transaction("rw", db.pages, db.highlights, db.outbox, db.syncState, async () => {
-    const binding = await db.syncState.get("bound-account");
+export async function bindLocalDatabaseToUser(userId: string): Promise<LiucaiDatabase> {
+  const database = await activateLocalDatabase(userId);
+  await database.transaction("rw", database.pages, database.highlights, database.outbox, database.syncState, async () => {
+    const binding = await database.syncState.get("bound-account");
     if (binding?.userId && binding.userId !== userId) {
-      throw new Error("此浏览器的本地数据已绑定其他账号。为避免数据串号，请先使用原账号登录。");
+      throw new Error("账号本地数据库的绑定信息不一致，已停止同步。");
     }
     if (!binding) {
-      await db.syncState.put({ key: "bound-account", cursor: 0, userId });
+      await database.syncState.put({ key: "bound-account", cursor: 0, userId });
     }
 
     const bootstrapKey = `bootstrap:${userId}`;
-    if (await db.syncState.get(bootstrapKey)) return;
+    if (await database.syncState.get(bootstrapKey)) return;
 
     const pendingEntities = new Set(
-      (await db.outbox.toArray()).map((mutation) => `${mutation.entityType}:${mutation.entityId}`),
+      (await database.outbox.toArray()).map((mutation) => `${mutation.entityType}:${mutation.entityId}`),
     );
-    for (const page of await db.pages.toArray()) {
-      if (!pendingEntities.has(`page:${page.id}`)) await enqueueSnapshot("page", page);
+    for (const page of await database.pages.toArray()) {
+      if (!pendingEntities.has(`page:${page.id}`)) await enqueueSnapshot("page", page, database);
     }
-    for (const highlight of await db.highlights.toArray()) {
-      if (!pendingEntities.has(`highlight:${highlight.id}`)) await enqueueSnapshot("highlight", highlight);
-    }
-
-    await db.syncState.put({ key: cursorKey(userId), cursor: 0, userId });
-    await db.syncState.put({ key: bootstrapKey, cursor: 0, userId });
-  });
-}
-
-export async function applySyncBatch(userId: string, result: SyncBatchResult): Promise<void> {
-  await db.transaction("rw", db.pages, db.highlights, db.outbox, db.syncState, async () => {
-    await db.outbox.bulkDelete(result.acknowledgedMutationIds);
-
-    for (const change of result.changes) {
-      if (await hasPendingLocalChange(change.entityType, change.entityId, change.payload)) continue;
-
-      if (change.entityType === "page") {
-        await applyRemotePage(change.payload as PageRecord);
-      } else if (change.operation === "delete") {
-        await applyRemoteHighlightDelete(change.entityId, change.payload as HighlightDeletePayload);
-      } else {
-        await applyRemoteHighlight(change.payload as HighlightRecord);
+    for (const highlight of await database.highlights.toArray()) {
+      if (!pendingEntities.has(`highlight:${highlight.id}`)) {
+        await enqueueSnapshot("highlight", highlight, database);
       }
     }
 
-    await db.syncState.put({
-      key: cursorKey(userId),
-      cursor: result.nextCursor,
-      userId,
-      lastSyncedAt: new Date().toISOString(),
-    });
+    await database.syncState.put({ key: cursorKey(userId), cursor: 0, userId });
+    await database.syncState.put({ key: bootstrapKey, cursor: 0, userId });
   });
+  return database;
+}
+
+export async function applySyncBatch(
+  userId: string,
+  result: SyncBatchResult,
+  database: LiucaiDatabase = db,
+): Promise<void> {
+  await database.transaction(
+    "rw",
+    database.pages,
+    database.highlights,
+    database.outbox,
+    database.syncState,
+    async () => {
+      await database.outbox.bulkDelete(result.acknowledgedMutationIds);
+
+      for (const change of result.changes) {
+        if (await hasPendingLocalChange(change.entityType, change.entityId, change.payload, database)) continue;
+
+        if (change.entityType === "page") {
+          await applyRemotePage(change.payload as PageRecord, database);
+        } else if (change.operation === "delete") {
+          await applyRemoteHighlightDelete(change.entityId, change.payload as HighlightDeletePayload, database);
+        } else {
+          await applyRemoteHighlight(change.payload as HighlightRecord, database);
+        }
+      }
+
+      await database.syncState.put({
+        key: cursorKey(userId),
+        cursor: result.nextCursor,
+        userId,
+        lastSyncedAt: new Date().toISOString(),
+      });
+    },
+  );
 }
 
 async function hasPendingLocalChange(
   entityType: SyncEntityType,
   entityId: string,
   payload: PageRecord | HighlightRecord | HighlightDeletePayload,
+  database: LiucaiDatabase,
 ): Promise<boolean> {
-  const direct = await db.outbox
+  const direct = await database.outbox
     .where("[entityType+entityId]")
     .equals([entityType, entityId])
     .count();
   if (direct > 0 || entityType !== "page") return direct > 0;
 
   const canonicalUrl = (payload as PageRecord).canonicalUrl;
-  return db.outbox.filter((mutation) => (
+  return database.outbox.filter((mutation) => (
     mutation.entityType === "page"
     && (mutation.payload as PageRecord).canonicalUrl === canonicalUrl
   )).count().then((count) => count > 0);
 }
 
-export async function recordSyncStateError(userId: string, message: string): Promise<void> {
-  const current = await db.syncState.get(cursorKey(userId));
-  await db.syncState.put({
+export async function recordSyncStateError(
+  userId: string,
+  message: string,
+  database: LiucaiDatabase = db,
+): Promise<void> {
+  const current = await database.syncState.get(cursorKey(userId));
+  await database.syncState.put({
     key: cursorKey(userId),
     cursor: current?.cursor ?? 0,
     userId,
@@ -265,30 +384,31 @@ export async function recordSyncStateError(userId: string, message: string): Pro
   });
 }
 
-async function applyRemotePage(payload: PageRecord): Promise<void> {
-  const existing = await db.pages.get(payload.id);
-  const canonicalMatch = await db.pages.where("canonicalUrl").equals(payload.canonicalUrl).first();
+async function applyRemotePage(payload: PageRecord, database: LiucaiDatabase): Promise<void> {
+  const existing = await database.pages.get(payload.id);
+  const canonicalMatch = await database.pages.where("canonicalUrl").equals(payload.canonicalUrl).first();
   const local = existing
     ?? (canonicalMatch && canonicalMatch.id !== payload.id ? canonicalMatch : undefined);
   const page = pickPageFields(payload, local);
   if (canonicalMatch && canonicalMatch.id !== page.id) {
-    await db.highlights.where("pageId").equals(canonicalMatch.id).modify({ pageId: page.id });
-    await db.pages.delete(canonicalMatch.id);
+    await database.highlights.where("pageId").equals(canonicalMatch.id).modify({ pageId: page.id });
+    await database.pages.delete(canonicalMatch.id);
   }
-  await db.pages.put(page);
+  await database.pages.put(page);
 }
 
-async function applyRemoteHighlight(payload: HighlightRecord): Promise<void> {
-  await db.highlights.put(normalizeHighlightRecord(pickHighlightFields(payload)));
+async function applyRemoteHighlight(payload: HighlightRecord, database: LiucaiDatabase): Promise<void> {
+  await database.highlights.put(normalizeHighlightRecord(pickHighlightFields(payload)));
 }
 
 async function applyRemoteHighlightDelete(
   id: string,
   payload: HighlightDeletePayload,
+  database: LiucaiDatabase,
 ): Promise<void> {
-  const existing = await db.highlights.get(id);
+  const existing = await database.highlights.get(id);
   if (!existing) return;
-  await db.highlights.put(normalizeHighlightRecord({
+  await database.highlights.put(normalizeHighlightRecord({
     ...existing,
     deletedAt: payload.deletedAt,
   }));
@@ -344,8 +464,9 @@ function assertNoteWithinLimit(note: string): void {
 async function enqueueSnapshot(
   entityType: SyncEntityType,
   payload: PageRecord | HighlightRecord,
+  database: LiucaiDatabase,
 ): Promise<void> {
-  await db.outbox.add({
+  await database.outbox.add({
     mutationId: generateUuid(),
     entityType,
     entityId: payload.id,

@@ -49,3 +49,12 @@ test("closes a selection toolbar when the account state changes", async () => {
   assert.match(source, /this\.selectionRequestId \+= 1/);
   assert.match(source, /this\.mounts\.hideToolbar\(\)/);
 });
+
+test("reloads page highlights when the active local account database changes", async () => {
+  const source = await readFile(new URL("../src/contentController.tsx", import.meta.url), "utf8");
+
+  assert.match(source, /changes\[LOCAL_DATABASE_SCOPE_STORAGE_KEY\]/);
+  assert.match(source, /this\.pagePromise = null/);
+  assert.match(source, /this\.editorDirty = false/);
+  assert.match(source, /changes\[LOCAL_DATABASE_SCOPE_STORAGE_KEY\][\s\S]*this\.refreshSyncedPage\(\)/);
+});

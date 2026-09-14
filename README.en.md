@@ -61,7 +61,7 @@ After sign-in, synchronization runs automatically:
 
 You can also select **Sync now** in the popup. A new computer signed in to the same account downloads the cloud data and restores it locally. Local changes that have not reached Supabase cannot be recovered if the local database is deleted.
 
-In the first release, one local database can be bound to only one Supabase account. This prevents the same local data from being uploaded to another account after sign-out.
+Highlights, notes, pending mutations, and sync cursors for guests and each Supabase account are stored in separate IndexedDB databases. Signing out or switching accounts changes the active local database, so content data is never shared across accounts. A legacy database already bound to an account is copied automatically into that account's new database, while the original is retained as a recoverable backup. Interface preferences, per-site switches, and model connection settings remain browser-level settings.
 
 ## Installation
 
@@ -106,7 +106,7 @@ npm run package
 - Cross-device changes are not pushed in real time; an idle device may take up to about five minutes to pull them.
 - AI is available only to signed-in users and requires a model service that supports the OpenAI Responses API.
 - Thinking cards and recall masks are not implemented yet.
-- Local multi-account isolation and automatic Obsidian sync are not implemented yet.
+- Importing guest data into an account and automatic Obsidian sync are not implemented yet.
 
 ## Data and security
 
