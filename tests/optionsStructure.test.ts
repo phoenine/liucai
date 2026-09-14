@@ -19,6 +19,16 @@ test("opens settings from an accessible popup header button", async () => {
   assert.match(popup, /lc-popup__settings-button/);
 });
 
+test("uses the extension image icon in popup and settings branding", async () => {
+  const popup = await readFile(new URL("../src/popup.tsx", import.meta.url), "utf8");
+  const options = await readFile(new URL("../src/options.tsx", import.meta.url), "utf8");
+
+  assert.match(popup, /<img alt="" aria-hidden="true" className="lc-popup__logo" src="icon128\.png"/);
+  assert.match(options, /<img alt="" aria-hidden="true" className="lc-options__logo" src="icon128\.png"/);
+  assert.doesNotMatch(popup, /className="lc-popup__logo">六/);
+  assert.doesNotMatch(options, /className="lc-options__logo">六/);
+});
+
 test("keeps cloud auth neutral until the stored session status is loaded", async () => {
   const popup = await readFile(new URL("../src/popup.tsx", import.meta.url), "utf8");
   const localization = await readFile(new URL("../src/shared/localization.ts", import.meta.url), "utf8");

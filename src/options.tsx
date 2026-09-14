@@ -171,7 +171,7 @@ function OptionsApp() {
     <main className="lc-options">
       <header className="lc-options__header">
         <div className="lc-options__brand">
-          <div aria-hidden="true" className="lc-options__logo">六</div>
+          <img alt="" aria-hidden="true" className="lc-options__logo" src="icon128.png" />
           <div>
             <p className="lc-options__eyebrow">六彩 Liucai</p>
             <h1>{copy.settings}</h1>
