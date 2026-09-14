@@ -387,7 +387,25 @@ function OptionsApp() {
             </>
           ) : (
             <>
-              <p className="lc-options__llm-endpoint"><code>{OPENAI_BASE_URL}</code><span>{copy.openaiEndpoint}</span></p>
+              <label>
+                <span>{copy.llmBaseUrl}</span>
+                <input
+                  disabled={llmBusy}
+                  onChange={(event) => {
+                    const value = event.currentTarget.value;
+                    markLlmChanged();
+                    setLlmSettings((current) => ({
+                      ...current,
+                      openai: { ...current.openai, baseUrl: value },
+                    }));
+                  }}
+                  placeholder={OPENAI_BASE_URL}
+                  spellCheck={false}
+                  type="url"
+                  value={llmSettings.openai.baseUrl}
+                />
+              </label>
+              <p className="lc-options__field-help">{copy.openaiEndpoint}</p>
               <label>
                 <span>{copy.llmModel}</span>
                 <input
