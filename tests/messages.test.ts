@@ -4,6 +4,7 @@ import {
   isAiExplainRequest,
   isAiCancelRequest,
   isAiExampleRequest,
+  isAiStreamUpdate,
   isAiTestConnectionRequest,
   isPageStatusRequest,
   isSetSiteDisabledRequest,
@@ -57,6 +58,23 @@ test("validates follow-up example requests", () => {
 test("requires an exact AI request id for cancellation", () => {
   assert.equal(isAiCancelRequest({ type: "LIUCAI_AI_CANCEL", requestId: "request-1" }), true);
   assert.equal(isAiCancelRequest({ type: "LIUCAI_AI_CANCEL" }), false);
+});
+
+test("accepts only correlated AI stream updates", () => {
+  assert.equal(isAiStreamUpdate({
+    type: "LIUCAI_AI_STREAM_UPDATE",
+    requestId: "request-1",
+    text: "partial",
+  }), true);
+  assert.equal(isAiStreamUpdate({
+    type: "LIUCAI_AI_STREAM_UPDATE",
+    requestId: "",
+    text: "partial",
+  }), false);
+  assert.equal(isAiStreamUpdate({
+    type: "LIUCAI_AI_STREAM_UPDATE",
+    requestId: "request-1",
+  }), false);
 });
 
 test("validates bounded AI connection tests", () => {

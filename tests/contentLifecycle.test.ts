@@ -79,3 +79,17 @@ test("drops the tooltip when the viewport moves and aborts model work on close",
   // Closing the AI card has to abort the background request, not just ignore its answer.
   assert.match(source, /type: "LIUCAI_AI_CANCEL", requestId/);
 });
+
+test("correlates streamed AI updates and reuses the open popover", async () => {
+  const controller = await controllerSource();
+  const background = await readFile(new URL("../src/background.ts", import.meta.url), "utf8");
+  const ui = await readFile(new URL("../src/contentUi.tsx", import.meta.url), "utf8");
+
+  assert.match(background, /LIUCAI_AI_STREAM_UPDATE/);
+  assert.match(background, /await progress\.flush\(\)/);
+  assert.match(controller, /message\.requestId === this\.activeAiModelRequestId/);
+  assert.match(controller, /this\.mounts\.updatePopover\(content\)/);
+  assert.match(controller, /status: "streaming", explanation: text/);
+  assert.match(ui, /props\.state\.status === "streaming"/);
+  assert.match(ui, /onLoadExample\(\(text\) =>/);
+});

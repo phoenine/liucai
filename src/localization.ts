@@ -130,7 +130,6 @@ export interface ContentCopy {
   aiExampleLoading: string;
   aiExampleFailed: string;
   aiAppendNote: string;
-  aiAppendCreatesHighlight: string;
   aiAppending: string;
   aiAppended: string;
   aiAppendUnavailable: string;
@@ -175,7 +174,7 @@ const OPTIONS_COPY: Record<ResolvedLocale, OptionsCopy> = {
     llmProvider: "连接方式",
     llmProviders: {
       "lm-studio": { label: "LM Studio", description: "连接本机或局域网中的 OpenAI 兼容服务" },
-      openai: { label: "OpenAI", description: "使用 API Key 直连 OpenAI 在线模型" },
+      openai: { label: "OpenAI", description: "使用 API Key 连接 OpenAI 官方或兼容服务" },
     },
     llmBaseUrl: "服务地址",
     llmModel: "模型 ID",
@@ -183,7 +182,7 @@ const OPTIONS_COPY: Record<ResolvedLocale, OptionsCopy> = {
     llmApiKey: "OpenAI API Key",
     llmOptionalApiKey: "访问令牌（可选）",
     llmStudioHelp: "请先在 LM Studio 的 Developer 页面启动服务。可填写 http://localhost:1234，保存时会自动补全 /v1。",
-    openaiEndpoint: "请求地址固定为 https://api.openai.com/v1",
+    openaiEndpoint: "填写 OpenAI 兼容服务地址（如 https://api.openai.com/v1），保存时会自动补全 /v1。",
     openaiDirectWarning: "个人自用模式：API Key 会保存在当前浏览器本地。直连浏览器扩展存在密钥暴露风险，请使用独立且受限额的 Key。",
     saveLlm: "保存",
     testLlm: "测试连接",
@@ -227,7 +226,7 @@ const OPTIONS_COPY: Record<ResolvedLocale, OptionsCopy> = {
     llmProvider: "Connection",
     llmProviders: {
       "lm-studio": { label: "LM Studio", description: "Connect to an OpenAI-compatible server on this computer or local network" },
-      openai: { label: "OpenAI", description: "Connect directly to an online OpenAI model with an API key" },
+      openai: { label: "OpenAI", description: "Connect to the official or a compatible OpenAI service with an API key" },
     },
     llmBaseUrl: "Server URL",
     llmModel: "Model ID",
@@ -235,7 +234,7 @@ const OPTIONS_COPY: Record<ResolvedLocale, OptionsCopy> = {
     llmApiKey: "OpenAI API Key",
     llmOptionalApiKey: "Access token (optional)",
     llmStudioHelp: "Start the server from LM Studio's Developer page first. You can enter http://localhost:1234; /v1 is added automatically.",
-    openaiEndpoint: "Requests use the fixed endpoint https://api.openai.com/v1",
+    openaiEndpoint: "Any OpenAI-compatible server URL works (for example https://api.openai.com/v1); /v1 is added automatically when saved.",
     openaiDirectWarning: "Personal-use mode: the API key is stored locally in this browser. Direct use from a browser extension risks exposing the key; use a separate key with a spending limit.",
     saveLlm: "Save",
     testLlm: "Test connection",
@@ -378,7 +377,6 @@ const CONTENT_COPY: Record<ResolvedLocale, ContentCopy> = {
     aiExampleLoading: "正在想栗子…",
     aiExampleFailed: "例子生成失败，再试一次",
     aiAppendNote: "补充到批注",
-    aiAppendCreatesHighlight: "补充时会同时创建一条高亮",
     aiAppending: "补充中…",
     aiAppended: "已补充",
     aiAppendUnavailable: "选区跨越多条高亮，暂时无法补充到批注。",
@@ -429,12 +427,11 @@ const CONTENT_COPY: Record<ResolvedLocale, ContentCopy> = {
     saveFailed: "Could not save. Try again.",
     aiLoading: "Understanding this selection…",
     aiTitle: "Quick AI explanation",
-    aiExample: "Give me an example 🌰",
+    aiExample: "Example",
     aiHideExample: "Hide example",
     aiExampleLoading: "Thinking of an example…",
     aiExampleFailed: "Example failed — try again",
     aiAppendNote: "Add to note",
-    aiAppendCreatesHighlight: "Adding this will also create a highlight",
     aiAppending: "Adding…",
     aiAppended: "Added",
     aiAppendUnavailable: "This selection crosses multiple highlights, so it cannot be added to a note yet.",

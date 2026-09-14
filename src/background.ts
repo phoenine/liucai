@@ -87,11 +87,13 @@ async function handleRequest(
   if (isAiExampleRequest(request) || isAiExplainRequest(request)) {
     const contextKey = aiContextKey(sender);
     const abort = aiRequests.begin(contextKey, request.requestId);
+    const progress = createAiProgressSender(sender, request.requestId);
     try {
       return isAiExampleRequest(request)
-        ? await generateExample(request, getAiDependencies(), abort.signal)
-        : await explainSelection(request, getAiDependencies(), abort.signal);
+        ? await generateExample(request, getAiDependencies(), abort.signal, progress.send)
+        : await explainSelection(request, getAiDependencies(), abort.signal, progress.send);
     } finally {
+      await progress.flush();
       aiRequests.finish(contextKey, request.requestId, abort);
     }
   }
@@ -111,6 +113,29 @@ async function handleRequest(
   const result = await handleStorageRequest(request);
   if (isMutationRequest(request)) void triggerSync().catch(() => undefined);
   return result;
+}
+
+function createAiProgressSender(
+  sender: chrome.runtime.MessageSender,
+  requestId: string,
+): { send: (text: string) => void; flush: () => Promise<void> } {
+  const tabId = sender.tab?.id;
+  if (typeof tabId !== "number") {
+    return { send: () => undefined, flush: async () => undefined };
+  }
+
+  let pending: Promise<void> = Promise.resolve();
+  const options = typeof sender.frameId === "number" ? { frameId: sender.frameId } : undefined;
+  return {
+    send: (text) => {
+      pending = pending.then(async () => {
+        const update = { type: "LIUCAI_AI_STREAM_UPDATE", requestId, text } as const;
+        if (options) await chrome.tabs.sendMessage(tabId, update, options);
+        else await chrome.tabs.sendMessage(tabId, update);
+      }).catch(() => undefined);
+    },
+    flush: () => pending,
+  };
 }
 
 function aiContextKey(sender: chrome.runtime.MessageSender): string {

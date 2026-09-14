@@ -12,6 +12,8 @@ export interface LlmSettingsV1 {
     apiKey: string;
   };
   openai: {
+    /** Any OpenAI-compatible endpoint; defaults to the official OpenAI API. */
+    baseUrl: string;
     model: string;
     apiKey: string;
   };
@@ -37,6 +39,7 @@ export const DEFAULT_LLM_SETTINGS: LlmSettingsV1 = {
     apiKey: "",
   },
   openai: {
+    baseUrl: OPENAI_BASE_URL,
     model: "",
     apiKey: "",
   },
@@ -53,11 +56,12 @@ export function normalizeLlmSettings(value: unknown): LlmSettingsV1 {
       ? candidate.provider
       : DEFAULT_LLM_SETTINGS.provider,
     lmStudio: {
-      baseUrl: normalizeBaseUrl(lmStudio.baseUrl),
+      baseUrl: normalizeBaseUrl(lmStudio.baseUrl, DEFAULT_LLM_SETTINGS.lmStudio.baseUrl),
       model: normalizeString(lmStudio.model),
       apiKey: normalizeString(lmStudio.apiKey),
     },
     openai: {
+      baseUrl: normalizeBaseUrl(openai.baseUrl, OPENAI_BASE_URL),
       model: normalizeString(openai.model),
       apiKey: normalizeString(openai.apiKey),
     },
@@ -66,7 +70,8 @@ export function normalizeLlmSettings(value: unknown): LlmSettingsV1 {
 
 export function isLlmSettingsComplete(settings: LlmSettingsV1): boolean {
   if (settings.provider === "openai") {
-    return Boolean(settings.openai.model.trim() && settings.openai.apiKey.trim());
+    return isHttpUrl(settings.openai.baseUrl)
+      && Boolean(settings.openai.model.trim() && settings.openai.apiKey.trim());
   }
   return isHttpUrl(settings.lmStudio.baseUrl) && Boolean(settings.lmStudio.model.trim());
 }
@@ -76,7 +81,7 @@ export function getActiveLlmConnection(settings: LlmSettingsV1): LlmConnection |
   if (!isLlmSettingsComplete(normalized)) return null;
   return normalized.provider === "openai"
     ? {
-      baseUrl: OPENAI_BASE_URL,
+      baseUrl: normalized.openai.baseUrl,
       model: normalized.openai.model,
       apiKey: normalized.openai.apiKey,
     }
@@ -103,9 +108,9 @@ export async function saveLlmSettings(
   return normalized;
 }
 
-function normalizeBaseUrl(value: unknown): string {
+function normalizeBaseUrl(value: unknown, fallback: string): string {
   const candidate = normalizeString(value);
-  if (!candidate) return DEFAULT_LLM_SETTINGS.lmStudio.baseUrl;
+  if (!candidate) return fallback;
   try {
     const url = new URL(candidate);
     if (url.pathname === "/" || url.pathname === "") {

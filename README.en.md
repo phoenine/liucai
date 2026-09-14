@@ -2,11 +2,11 @@
 
 [简体中文](README.md) · [English](README.en.md)
 
-Liucai is a Chrome extension for highlighting and annotating web pages. It is local-first: every local feature works without an account, while optional Supabase sign-in enables cloud backup and cross-device sync.
+Liucai is a Chrome extension for highlighting, annotating, and understanding web pages. It is local-first: core features such as highlighting, notes, and export work without an account. Signing in with Supabase adds cloud backup, cross-device sync, and AI understanding after a model service is configured.
 
 > Liucai is currently a development preview and must be installed as an unpacked extension.
 
-![Web highlighting and annotations](images/pic1.png)
+![Web highlighting and annotations](images/pic1_en.png)
 
 ## Features
 
@@ -14,14 +14,40 @@ Liucai is a Chrome extension for highlighting and annotating web pages. It is lo
 - Notes and tags for every highlight
 - Hover previews for notes and tags
 - Automatic highlight restoration after reopening a page
+- Separate toolbars for a new selection, an existing highlight, and a selection inside a highlight
 - A sidebar for locating, editing, copying, and deleting highlights
 - Markdown export designed for Obsidian
+- Streaming AI explanations and everyday examples for selected text after sign-in, with an option to add them to notes
+- Settings for English or Chinese UI, the default highlight color, and model connections
 - Per-site enable and disable controls
 - Optional Supabase cloud backup and cross-device sync
 
-![Highlight toolbar](images/pic2.png)
+![Highlight toolbar](images/pic2_en.png)
 
-![Highlights sidebar](images/pic3.png)
+![Highlights sidebar](images/pic3_en.png)
+
+## AI understanding
+
+After signing in, select text in regular page content or inside an existing highlight and choose AI from the toolbar. Liucai streams a concise explanation grounded in the nearby context and supports basic Markdown emphasis. You can then request a familiar everyday analogy or add the explanation and example to a note.
+
+![AI understanding](images/pic4_en.png)
+
+AI requests run only after an explicit click. Selecting or hovering over text and opening a page never sends page content automatically. Liucai currently connects directly to either:
+
+- LM Studio or another local service compatible with the OpenAI Responses API
+- the official OpenAI service or a compatible HTTPS service
+
+Configure the endpoint, model ID, and credentials in Settings, where you can test the connection first. Quick explanations and examples run without reasoning to favor responsiveness. **Thinking card** remains a disabled placeholder for a future feature.
+
+## Settings
+
+Open Settings from the button in the popup header to manage preferences across pages:
+
+- interface language: follow the browser, Simplified Chinese, or English
+- the default highlight color used when creating a note or tag
+- LM Studio and OpenAI-compatible model connections
+
+The language preference applies to the popup, Settings, page toolbars, note editor, and highlights sidebar.
 
 ## Local-first storage and sync
 
@@ -57,7 +83,7 @@ cp .env.example .env.local
 npm run build
 ```
 
-Set the Supabase Project URL and publishable key in `.env.local`, then load `dist/` in Chrome. Never use a secret or service role key in the client.
+To use cloud sync, set the Supabase Project URL and publishable key in `.env.local`. Local highlighting and notes still work without them. After building, load `dist/` in Chrome. Never use a secret or service role key in the client.
 
 ## Development
 
@@ -72,28 +98,21 @@ npm run package
 - `npm run package` creates `artifacts/liucai-extension-v<version>.zip`
 - The ZIP root contains `manifest.json` directly and excludes source maps
 
-## GitHub CI and releases
-
-The [CI workflow](.github/workflows/ci-release.yml) runs tests, type checking, builds, and packaging on `main`, `dev`, pull requests, and manual runs. It retains the resulting Actions Artifact for 14 days.
-
-Pushing a tag that matches the version in `package.json`, such as `v1.0.0` or `1.0.0`, automatically creates or updates a GitHub Release and uploads the extension ZIP. The ZIP appears under the Release **Assets**, not in GitHub **Packages**.
-
-Before publishing a release with cloud sync, add these repository variables under **Settings → Secrets and variables → Actions → Variables**:
-
-- `VITE_SUPABASE_URL`
-- `VITE_SUPABASE_PUBLISHABLE_KEY`
-
 ## Current limitations
 
 - Desktop Chrome and regular web page content only.
 - PDF files, iframes, Shadow DOM, Google Docs, Lark Docs, Notion, and other complex pages are not guaranteed to work.
 - Highlights may not be restored if the source page changes substantially.
 - Cross-device changes are not pushed in real time; an idle device may take up to about five minutes to pull them.
+- AI is available only to signed-in users and requires a model service that supports the OpenAI Responses API.
+- Thinking cards and recall masks are not implemented yet.
 - Local multi-account isolation and automatic Obsidian sync are not implemented yet.
 
 ## Data and security
 
 - Local records are stored in IndexedDB under the extension origin.
-- The Supabase session is stored in `chrome.storage.local` and is not exposed to page scripts.
+- The Supabase session and model connection settings are stored in `chrome.storage.local` and are not written into the page DOM.
 - The client contains only a Supabase publishable key.
 - Cloud writes use an authenticated RPC, with Row Level Security isolating user data.
+- When AI is used, Liucai sends the selected text and nearby context directly to the configured model service. It does not send the page title or URL.
+- The OpenAI API key is stored locally in the current browser. Direct use from a browser extension risks exposing the key, so use a separate key with a spending limit.

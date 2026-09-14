@@ -68,6 +68,7 @@ test("offers separate LM Studio and OpenAI direct connection settings", async ()
   assert.match(options, /saveLlmSettings/);
   assert.match(options, /type="password"/);
   assert.match(options, /OPENAI_BASE_URL/);
+  assert.match(options, /llmSettings\.openai\.baseUrl/);
   assert.match(localization, /API Key 会保存在当前浏览器本地/);
   assert.match(localization, /Direct use from a browser extension risks exposing the key/);
 });
@@ -79,7 +80,7 @@ test("captures LLM input values before queued React state updates", async () => 
     options,
     /setLlmSettings\(\(current\) => \(\{[\s\S]{0,180}event\.currentTarget\.value/,
   );
-  assert.equal(options.match(/const value = event\.currentTarget\.value;/g)?.length, 5);
+  assert.equal(options.match(/const value = event\.currentTarget\.value;/g)?.length, 6);
 });
 
 test("offers save feedback, a real connection test, and reduced-motion press feedback", async () => {

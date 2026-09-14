@@ -12,6 +12,7 @@ const QUOTE = /^>\s?(.*)$/;
 const FENCE_OPEN = /^( {0,3})(`{3,})(.*)$/;
 const LANG = /^[a-zA-Z0-9_+-]+$/;
 const WORD = /[\p{L}\p{N}]/u;
+const CJK = /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}]/u;
 const SPECIAL = "*`\\";
 // Nested quotes recurse in both parse and render, so a page of ">" characters would otherwise
 // blow the call stack on input as small as 2 KB.
@@ -202,8 +203,7 @@ function parseInline(text: string): ReactNode[] {
 
     if (text[index] === "*") {
       // Consume the asterisk literally when it cannot open emphasis, so a marker that stays
-      // literal is never reinterpreted as a shorter one (which used to mangle intraword text
-      // such as "这是**重点**内容" into "*<em>重点*</em>").
+      // literal is never reinterpreted as a shorter one (which can mangle delimiter runs).
       if (markerRunLength(text, index) === 2 && canOpenEmphasis(text, index, 2)) {
         const close = findStrongClose(index + 2);
         if (close !== -1) {
@@ -240,7 +240,10 @@ function canOpenEmphasis(text: string, index: number, markerLength: number): boo
     return false;
   }
   const before = index > 0 ? text[index - 1] : "";
-  return !(WORD.test(before) && WORD.test(after));
+  if (!(WORD.test(before) && WORD.test(after))) return true;
+  // Chinese prose normally has no spaces around emphasis markers. Permit that common authoring
+  // style while preserving literal markers inside Latin identifiers such as a**b**c.
+  return CJK.test(before) || CJK.test(after);
 }
 
 function findEmphasisClose(text: string, from: number, markerLength: number): number {

@@ -29,6 +29,7 @@ test("defaults to the documented local LM Studio endpoint", () => {
   assert.equal(DEFAULT_LLM_SETTINGS.provider, "lm-studio");
   assert.equal(DEFAULT_LLM_SETTINGS.lmStudio.baseUrl, "http://localhost:1234/v1");
   assert.equal(OPENAI_BASE_URL, "https://api.openai.com/v1");
+  assert.equal(DEFAULT_LLM_SETTINGS.openai.baseUrl, OPENAI_BASE_URL);
 });
 
 test("requires the fields needed by each direct connection", () => {
@@ -40,7 +41,7 @@ test("requires the fields needed by each direct connection", () => {
   assert.equal(isLlmSettingsComplete({
     ...DEFAULT_LLM_SETTINGS,
     provider: "openai",
-    openai: { model: "online-model", apiKey: "sk-test" },
+    openai: { baseUrl: OPENAI_BASE_URL, model: "online-model", apiKey: "sk-test" },
   }), true);
 });
 
@@ -49,7 +50,7 @@ test("stores LLM credentials separately from ordinary preferences", async () => 
   const settings = {
     ...DEFAULT_LLM_SETTINGS,
     provider: "openai" as const,
-    openai: { model: "online-model", apiKey: "sk-local-only" },
+    openai: { baseUrl: OPENAI_BASE_URL, model: "online-model", apiKey: "sk-local-only" },
   };
 
   await saveLlmSettings(settings, storage);
@@ -104,5 +105,49 @@ test("refuses model endpoints that would send the API key somewhere unsafe", () 
   // Local servers over http, and any https endpoint, stay allowed.
   assert.equal(complete("http://localhost:1234/v1"), true);
   assert.equal(complete("http://127.0.0.1:1234/v1"), true);
+  assert.equal(complete("https://models.example/v1"), true);
+});
+
+test("lets the OpenAI connection point at any compatible endpoint", () => {
+  const normalized = normalizeLlmSettings({
+    provider: "openai",
+    openai: { baseUrl: " https://models.example/ ", model: " online-model ", apiKey: " sk-test " },
+  });
+
+  assert.equal(normalized.openai.baseUrl, "https://models.example/v1");
+  assert.equal(normalized.openai.apiKey, "sk-test");
+  assert.equal(getActiveLlmConnection(normalized)?.baseUrl, "https://models.example/v1");
+
+  // A gateway that already exposes a path keeps it; only a bare origin gains /v1.
+  assert.equal(normalizeLlmSettings({
+    provider: "openai",
+    openai: { baseUrl: "https://gateway.example/openai/v1/", model: "m", apiKey: "k" },
+  }).openai.baseUrl, "https://gateway.example/openai/v1");
+  assert.equal(normalizeLlmSettings({
+    provider: "openai",
+    openai: { baseUrl: "http://localhost:8080", model: "m", apiKey: "k" },
+  }).openai.baseUrl, "http://localhost:8080/v1");
+});
+
+test("keeps the official OpenAI endpoint for settings stored before it was configurable", () => {
+  const legacy = normalizeLlmSettings({
+    provider: "openai",
+    openai: { model: "online-model", apiKey: "sk-test" },
+  });
+
+  assert.equal(legacy.openai.baseUrl, OPENAI_BASE_URL);
+  assert.equal(getActiveLlmConnection(legacy)?.baseUrl, OPENAI_BASE_URL);
+});
+
+test("refuses an OpenAI-compatible endpoint that would send the API key somewhere unsafe", () => {
+  const complete = (baseUrl: string): boolean => isLlmSettingsComplete(normalizeLlmSettings({
+    provider: "openai",
+    openai: { baseUrl, model: "online-model", apiKey: "sk-test" },
+  }));
+
+  assert.equal(complete("http://evil.example/v1"), false);
+  assert.equal(complete("https://user:pass@evil.example/v1"), false);
+  assert.equal(complete("not-a-url"), false);
+  assert.equal(complete("http://localhost:8080/v1"), true);
   assert.equal(complete("https://models.example/v1"), true);
 });

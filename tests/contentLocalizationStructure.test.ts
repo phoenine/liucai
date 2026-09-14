@@ -10,6 +10,10 @@ test("content UI reads all interactive labels from localized copy", async () => 
   assert.match(source, /props\.copy\.editorTitle/);
   assert.match(source, /props\.copy\.notePlaceholder/);
   assert.match(source, /props\.copy\.confirmDelete/);
+  assert.match(source, /aria-label=\{`\$\{props\.copy\.aiTitle\}: \$\{props\.subject\}`\}/);
+  assert.match(source, /<span title=\{props\.subject\}>\{props\.subject\}<\/span>/);
+  assert.doesNotMatch(source, /<h3>\{props\.state\.explanation\.concept\}<\/h3>/);
+  assert.match(source, /aiExample[\s\S]*aiThoughtCard[\s\S]*aiAppendNote/);
   assert.doesNotMatch(source, /批注与标签|六彩划线列表|还没有划线|确认删除/);
 });
 

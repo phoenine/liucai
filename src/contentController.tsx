@@ -19,6 +19,7 @@ import { HoverRequestTracker } from "./hoverRequest";
 import { generateUuid } from "./id";
 import {
   AI_AUTH_STATE_STORAGE_KEY,
+  isAiStreamUpdate,
   isPageStatusRequest,
   isSetSiteDisabledRequest,
   type PageStatus,
@@ -99,6 +100,7 @@ export class ContentController {
   private selectionRequestId = 0;
   private aiRequestId = 0;
   private activeAiModelRequestId: string | null = null;
+  private activeAiStreamUpdate: ((text: string) => void) | null = null;
   private mouseDownStartedInUi = false;
   private ignorePageClickUntilMouseDown = false;
   private editorDirty = false;
@@ -473,6 +475,7 @@ export class ContentController {
     const requestId = this.activeAiModelRequestId;
     if (!requestId) return;
     this.activeAiModelRequestId = null;
+    this.activeAiStreamUpdate = null;
     void chrome.runtime.sendMessage({ type: "LIUCAI_AI_CANCEL", requestId }).catch(() => undefined);
   }
 
@@ -596,24 +599,23 @@ export class ContentController {
     const rect = range.getBoundingClientRect();
     const highlightIds = this.getIntersectingHighlightIds(range);
     const requestId = ++this.aiRequestId;
+    let popoverNode: HTMLElement | null = null;
     this.mounts.hideToolbar();
     window.getSelection()?.removeAllRanges();
 
     const render = (state: AiExplanationCardState): void => {
       if (requestId !== this.aiRequestId) return;
       const explanation = state.status === "success" ? state.explanation : null;
-      const node = this.mounts.showPopover(
-        rect.left,
-        rect.bottom + 8,
-        <AiExplanationCard
+      const content = <AiExplanationCard
           copy={this.contentCopy}
+          subject={selectedText}
           state={state}
           canAppend={highlightIds.length <= 1}
-          createsHighlight={highlightIds.length === 0}
-          onLoadExample={async () => {
+          onLoadExample={async (onUpdate) => {
             if (!explanation) throw new Error("AI_EXPLANATION_MISSING");
             const modelRequestId = generateUuid();
             this.activeAiModelRequestId = modelRequestId;
+            this.activeAiStreamUpdate = onUpdate;
             const response = await chrome.runtime.sendMessage({
               type: "LIUCAI_AI_EXAMPLE",
               requestId: modelRequestId,
@@ -622,7 +624,10 @@ export class ContentController {
               concept: explanation.concept,
               locale: this.interfaceLocale,
             }).finally(() => {
-              if (this.activeAiModelRequestId === modelRequestId) this.activeAiModelRequestId = null;
+              if (this.activeAiModelRequestId === modelRequestId) {
+                this.activeAiModelRequestId = null;
+                this.activeAiStreamUpdate = null;
+              }
             }) as StorageResponse<AiExample> | undefined;
             if (!response?.ok) throw new Error(response?.error ?? "AI_REQUEST_FAILED");
             return response.data.example;
@@ -637,9 +642,16 @@ export class ContentController {
             this.cancelAiRequest();
             this.mounts.hidePopover();
           }}
-        />,
-        "liucai-ai-popover",
-      );
+        />;
+      const node = popoverNode?.isConnected
+        ? this.mounts.updatePopover(content) ?? popoverNode
+        : this.mounts.showPopover(
+          rect.left,
+          rect.bottom + 8,
+          content,
+          "liucai-ai-popover",
+        );
+      popoverNode = node;
       this.mounts.fitPopoverInViewport(node);
     };
 
@@ -647,6 +659,9 @@ export class ContentController {
       render({ status: "loading" });
       const modelRequestId = generateUuid();
       this.activeAiModelRequestId = modelRequestId;
+      this.activeAiStreamUpdate = (text) => {
+        if (requestId === this.aiRequestId) render({ status: "streaming", explanation: text });
+      };
       void chrome.runtime.sendMessage({
         type: "LIUCAI_AI_EXPLAIN",
         requestId: modelRequestId,
@@ -663,7 +678,10 @@ export class ContentController {
       }).catch((error) => {
         render({ status: "error", error: this.stringifyError(error) });
       }).finally(() => {
-        if (this.activeAiModelRequestId === modelRequestId) this.activeAiModelRequestId = null;
+        if (this.activeAiModelRequestId === modelRequestId) {
+          this.activeAiModelRequestId = null;
+          this.activeAiStreamUpdate = null;
+        }
       });
     };
 
@@ -1090,9 +1108,16 @@ export class ContentController {
 
   private handleRuntimeMessage = (
     message: unknown,
-    _sender: chrome.runtime.MessageSender,
+    sender: chrome.runtime.MessageSender,
     sendResponse: (response?: unknown) => void,
   ): boolean | undefined => {
+    if (sender.id === chrome.runtime.id && isAiStreamUpdate(message)) {
+      if (message.requestId === this.activeAiModelRequestId) {
+        this.activeAiStreamUpdate?.(message.text);
+      }
+      return undefined;
+    }
+
     if (isPageStatusRequest(message)) {
       void this.transitions
         .run(() => this.getPageStatus())

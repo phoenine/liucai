@@ -6,17 +6,11 @@ export function formatAiExplanationNote(
   locale: ResolvedLocale,
   example?: string,
 ): string {
-  if (locale === "zh-CN") {
-    return [
-      `AI 解释｜${explanation.concept}`,
-      explanation.explanation,
-      ...(example ? [`例子：${example}`] : []),
-    ].join("\n");
-  }
   return [
-    `AI explanation | ${explanation.concept}`,
     explanation.explanation,
-    ...(example ? [`Example: ${example}`] : []),
+    ...(example
+      ? ["", locale === "zh-CN" ? "**举个栗子🌰**" : "**Example 🌰**", example]
+      : []),
   ].join("\n");
 }
 
