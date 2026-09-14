@@ -114,12 +114,12 @@ test("closes longer fences and re-parses blocks inside quotes", () => {
   assert.match(quotedList, /<blockquote><ul><li>item<\/li><\/ul><\/blockquote>/);
 });
 
-test("keeps emphasis markers literal when they sit inside a word", () => {
-  const cjk = html("这是**重点**内容");
+test("renders emphasis next to CJK text but keeps Latin intraword markers literal", () => {
+  const cjk = html("模型**主动审视**自身，也像一位*手持放大镜*的监理");
   const latin = html("a**b**c");
 
-  assert.match(cjk, /这是\*\*重点\*\*内容/);
-  assert.doesNotMatch(cjk, /<strong>|<em>/);
+  assert.match(cjk, /模型<strong>主动审视<\/strong>自身/);
+  assert.match(cjk, /一位<em>手持放大镜<\/em>的监理/);
   assert.match(latin, /a\*\*b\*\*c/);
   assert.doesNotMatch(latin, /<strong>|<em>/);
 });

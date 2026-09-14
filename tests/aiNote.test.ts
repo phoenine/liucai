@@ -9,10 +9,24 @@ const explanation = {
 
 test("formats localized AI notes and preserves an existing note", () => {
   const block = formatAiExplanationNote(explanation, "zh-CN", "客服机器人先搜索产品手册。");
-  assert.match(block, /^AI 解释｜检索增强生成/);
-  assert.match(block, /这里指引用\*\*当前知识库\*\*。/);
+  assert.equal(block, [
+    "回答前先查资料，这里指引用**当前知识库**。",
+    "",
+    "**举个栗子🌰**",
+    "客服机器人先搜索产品手册。",
+  ].join("\n"));
   assert.equal(appendNote("我的批注", block), `我的批注\n\n${block}`);
   assert.equal(appendNote("", block), block);
+  assert.equal(formatAiExplanationNote(explanation, "zh-CN"), explanation.explanation);
+  assert.equal(
+    formatAiExplanationNote(explanation, "en", "A support bot searches the manual first."),
+    [
+      explanation.explanation,
+      "",
+      "**Example 🌰**",
+      "A support bot searches the manual first.",
+    ].join("\n"),
+  );
 });
 
 test("rejects an append that would exceed the note limit without truncating it", () => {

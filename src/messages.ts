@@ -62,6 +62,12 @@ export interface AiCancelRequest {
   requestId: string;
 }
 
+export interface AiStreamUpdate {
+  type: "LIUCAI_AI_STREAM_UPDATE";
+  requestId: string;
+  text: string;
+}
+
 export interface PageStatus {
   ok: true;
   canonicalUrl: string;
@@ -175,6 +181,14 @@ export function isAiCancelRequest(message: unknown): message is AiCancelRequest 
     && message !== null
     && (message as AiCancelRequest).type === "LIUCAI_AI_CANCEL"
     && isRequestId((message as AiCancelRequest).requestId);
+}
+
+export function isAiStreamUpdate(message: unknown): message is AiStreamUpdate {
+  if (typeof message !== "object" || message === null) return false;
+  const update = message as Partial<AiStreamUpdate>;
+  return update.type === "LIUCAI_AI_STREAM_UPDATE"
+    && isRequestId(update.requestId)
+    && typeof update.text === "string";
 }
 
 function isRequestId(value: unknown): value is string {

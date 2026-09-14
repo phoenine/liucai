@@ -53,17 +53,39 @@ test("visually separates readable sidebar notes from excerpt text", async () => 
   const ui = await readFile(new URL("../src/contentUi.tsx", import.meta.url), "utf8");
   const textRule = css.match(/\.liucai-sidebar-item__text\s*\{[^}]*\}/s)?.[0];
   const noteRule = css.match(/\.liucai-sidebar-item__note\s*\{[^}]*\}/s)?.[0];
-  const labelRule = css.match(/\.liucai-sidebar-item__note-label\s*\{[^}]*\}/s)?.[0];
+  const stampRule = css.match(/\.liucai-sidebar-item__note-stamp\s*\{[^}]*\}/s)?.[0];
 
   assert.ok(textRule);
   assert.ok(noteRule);
-  assert.ok(labelRule);
+  assert.ok(stampRule);
   assert.match(textRule, /font:\s*13\.5px\/1\.55/);
-  assert.match(noteRule, /background:\s*rgba\(255, 255, 255, 0\.62\);/);
+  assert.match(noteRule, /background:\s*rgba\(255, 255, 255, 0\.55\);/);
+  assert.match(noteRule, /border-radius:\s*7px;/);
+  assert.doesNotMatch(noteRule, /border:/);
   assert.match(noteRule, /color:\s*#273244;/i);
   assert.match(noteRule, /font:\s*13px\/1\.6/);
-  assert.match(labelRule, /color:\s*var\(--liucai-marker\);/);
-  assert.match(ui, /className="liucai-sidebar-item__note-label"[\s\S]*?<NotePencilIcon[\s\S]*?props\.copy\.note/);
+  assert.match(noteRule, /padding:\s*20px 9px 8px;/);
+  assert.match(noteRule, /position:\s*relative;/);
+  assert.match(stampRule, /background:\s*var\(--liucai-marker\);/);
+  assert.match(stampRule, /height:\s*18px;/);
+  assert.match(stampRule, /pointer-events:\s*none;/);
+  assert.match(stampRule, /position:\s*absolute;/);
+  assert.match(stampRule, /top:\s*-4px;/);
+  assert.match(stampRule, /width:\s*18px;/);
+  assert.doesNotMatch(css, /\.liucai-sidebar-item__note-(?:label|body)/);
+  assert.match(ui, /<section aria-label={props\.copy\.note} className="liucai-sidebar-item__note">/);
+  assert.match(ui, /<span aria-hidden="true" className="liucai-sidebar-item__note-stamp">注<\/span>/);
+});
+
+test("uses the plugin slate palette for the sidebar export action", async () => {
+  const css = await readFile(new URL("../public/content.css", import.meta.url), "utf8");
+  const buttonRule = css.match(/\.liucai-sidebar__export button\s*\{[^}]*\}/s)?.[0];
+  const hoverRule = css.match(/\.liucai-sidebar__export button:hover\s*\{[^}]*\}/s)?.[0];
+
+  assert.ok(buttonRule);
+  assert.ok(hoverRule);
+  assert.match(buttonRule, /background:\s*#475569;/i);
+  assert.match(hoverRule, /background:\s*#334155;/i);
 });
 
 test("preserves semantic newlines in sidebar highlight text", async () => {
@@ -81,6 +103,19 @@ test("styles shared Markdown paragraphs, lists, and code", async () => {
   assert.match(css, /\.liucai-markdown :is\(ul, ol\)\s*\{[^}]*padding-left:/s);
   assert.match(css, /\.liucai-markdown li\s*\{[^}]*margin-top:/s);
   assert.match(css, /\.liucai-markdown pre\s*\{[^}]*overflow-x:\s*auto;/s);
+});
+
+test("keeps the selected AI subject compact in the card header", async () => {
+  const css = await readFile(new URL("../public/content.css", import.meta.url), "utf8");
+  const titleRule = css.match(/\.liucai-ai-card__title\s*\{[^}]*\}/s)?.[0];
+  const subjectRule = css.match(/\.liucai-ai-card__title span\s*\{[^}]*\}/s)?.[0];
+
+  assert.ok(titleRule);
+  assert.ok(subjectRule);
+  assert.match(titleRule, /overflow:\s*hidden;/);
+  assert.match(subjectRule, /text-overflow:\s*ellipsis;/);
+  assert.match(subjectRule, /white-space:\s*nowrap;/);
+  assert.doesNotMatch(css, /\.liucai-ai-card h3\s*\{/);
 });
 
 test("keeps tooltip notes and tags consistent with sidebar cards", async () => {
@@ -120,6 +155,19 @@ test("keeps the AI toolbar button background consistent with other actions", asy
   assert.match(aiRule, /background:\s*#ffffff;/i);
   assert.match(aiRule, /color:\s*#475569;/i);
   assert.doesNotMatch(aiRule, /#7c3aed|#6d28d9/i);
+});
+
+test("gives AI card actions restrained press feedback", async () => {
+  const css = await readFile(new URL("../public/content.css", import.meta.url), "utf8");
+  const transitionRule = css.match(/\.liucai-ai-card__actions button\s*\{[^}]*\}/s)?.[0];
+  const activeRule = css.match(/\.liucai-ai-card__actions button:not\(:disabled\):active\s*\{[^}]*\}/s)?.[0];
+
+  assert.ok(transitionRule);
+  assert.ok(activeRule);
+  assert.match(transitionRule, /transform 140ms cubic-bezier\(0\.23, 1, 0\.32, 1\)/);
+  assert.match(activeRule, /transform:\s*scale\(0\.97\);/);
+  assert.match(css, /prefers-reduced-motion:[^)]+\)[^{]*\{[\s\S]*\.liucai-ai-card__actions button\s*\{\s*transition:\s*opacity 100ms ease;/);
+  assert.match(css, /prefers-reduced-motion:[\s\S]*\.liucai-ai-card__actions button:not\(:disabled\):active\s*\{[^}]*transform:\s*none;/);
 });
 
 test("uses the sourced Phosphor chat icon without adding a DOM component", async () => {

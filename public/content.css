@@ -259,17 +259,28 @@
 }
 
 .liucai-ai-card__header {
+  gap: 10px;
   justify-content: space-between;
-  margin-bottom: 12px;
+  margin-bottom: 10px;
 }
 
 .liucai-ai-card__title {
-  color: #334155;
-  font: 700 13px/1.2 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  color: #0f172a;
+  font: 700 16px/1.3 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   gap: 7px;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.liucai-ai-card__title span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .liucai-ai-card__title svg {
+  flex: 0 0 auto;
   height: 18px;
   width: 18px;
 }
@@ -285,12 +296,6 @@
 .liucai-ai-card__close svg {
   height: 17px;
   width: 17px;
-}
-
-.liucai-ai-card h3 {
-  color: #0f172a;
-  font: 700 17px/1.35 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  margin: 0 0 12px;
 }
 
 .liucai-ai-card__explanation {
@@ -401,6 +406,14 @@
   margin-top: 13px;
 }
 
+.liucai-ai-card__actions button {
+  transition: transform 140ms cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+.liucai-ai-card__actions button:not(:disabled):active {
+  transform: scale(0.97);
+}
+
 .liucai-popover .liucai-ai-card__actions button[data-action="primary"] {
   background: #111827;
   color: #ffffff;
@@ -448,6 +461,11 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .liucai-ai-card__actions button { transition: opacity 100ms ease; }
+  .liucai-ai-card__actions button:not(:disabled):active {
+    opacity: 0.82;
+    transform: none;
+  }
   .liucai-ai-card__spinner { animation-duration: 1600ms; }
 }
 
@@ -730,7 +748,7 @@
 .liucai-sidebar__export button {
   all: initial;
   align-items: center;
-  background: #2563eb;
+  background: #475569;
   border-radius: 8px;
   color: #ffffff;
   cursor: pointer;
@@ -743,7 +761,7 @@
 }
 
 .liucai-sidebar__export button:hover {
-  background: #1d4ed8;
+  background: #334155;
 }
 
 .liucai-sidebar__export button:disabled {
@@ -752,7 +770,7 @@
 }
 
 .liucai-sidebar__export button:disabled:hover {
-  background: #2563eb;
+  background: #475569;
 }
 
 .liucai-sidebar__export button[data-status="copied"] {
@@ -883,33 +901,34 @@
 
 .liucai-sidebar-item__note {
   all: initial;
-  background: rgba(255, 255, 255, 0.62);
-  border: 1px solid rgba(17, 24, 39, 0.07);
-  border-radius: 9px;
+  background: rgba(255, 255, 255, 0.55);
+  border-radius: 7px;
   box-sizing: border-box;
   color: #273244;
   display: block;
   font: 13px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   margin: 10px 0 0;
-  padding: 8px 9px 9px;
+  padding: 20px 9px 8px;
+  position: relative;
 }
 
-.liucai-sidebar-item__note-label {
+.liucai-sidebar-item__note-stamp {
   align-items: center;
-  color: var(--liucai-marker);
+  background: var(--liucai-marker);
+  border-radius: 4px;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.48);
+  box-sizing: border-box;
+  color: #fffdf7;
   display: flex;
-  font: 700 11px/1.2 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  gap: 5px;
-}
-
-.liucai-sidebar-item__note-label svg {
-  flex: none;
-  height: 13px;
-  width: 13px;
-}
-
-.liucai-sidebar-item__note-body {
-  margin-top: 5px;
+  font: 700 11px/1 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  height: 18px;
+  justify-content: center;
+  pointer-events: none;
+  position: absolute;
+  right: 8px;
+  top: -4px;
+  user-select: none;
+  width: 18px;
 }
 
 .liucai-sidebar-item__tags {

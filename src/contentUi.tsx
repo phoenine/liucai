@@ -79,14 +79,16 @@ export function LearningToolbar(props: {
 
 export type AiExplanationCardState =
   | { status: "loading" }
+  | { status: "streaming"; explanation: string }
   | { status: "error"; error: string }
   | { status: "success"; explanation: AiExplanation };
 
 export function AiExplanationCard(props: {
   copy: ContentCopy;
+  subject: string;
   state: AiExplanationCardState;
   canAppend: boolean;
-  onLoadExample: () => Promise<string>;
+  onLoadExample: (onUpdate: (text: string) => void) => Promise<string>;
   onAppend: (example?: string) => Promise<void>;
   onRetry: () => void;
   onClose: () => void;
@@ -117,7 +119,10 @@ export function AiExplanationCard(props: {
     }
     if (exampleStatus === "loading") return;
     setExampleStatus("loading");
-    void props.onLoadExample()
+    void props.onLoadExample((text) => {
+      setExample(text);
+      setExampleOpen(true);
+    })
       .then((value) => {
         setExample(value);
         setExampleOpen(true);
@@ -127,11 +132,15 @@ export function AiExplanationCard(props: {
   };
 
   return (
-    <section className="liucai-ai-card" aria-live="polite">
+    <section
+      aria-label={`${props.copy.aiTitle}: ${props.subject}`}
+      aria-live="polite"
+      className="liucai-ai-card"
+    >
       <header className="liucai-ai-card__header">
         <div className="liucai-ai-card__title">
           <SparkleIcon aria-hidden weight="regular" />
-          <span>{props.copy.aiTitle}</span>
+          <span title={props.subject}>{props.subject}</span>
         </div>
         <button className="liucai-ai-card__close" title={props.copy.aiClose} onClick={props.onClose}>
           <XIcon aria-hidden weight="regular" />
@@ -145,6 +154,12 @@ export function AiExplanationCard(props: {
         </div>
       ) : null}
 
+      {props.state.status === "streaming" ? (
+        <div className="liucai-ai-card__explanation">
+          <SafeMarkdown>{props.state.explanation}</SafeMarkdown>
+        </div>
+      ) : null}
+
       {props.state.status === "error" ? (
         <div className="liucai-ai-card__error">
           <strong>{props.copy.aiFailed}</strong>
@@ -155,7 +170,6 @@ export function AiExplanationCard(props: {
 
       {props.state.status === "success" ? (
         <>
-          <h3>{props.state.explanation.concept}</h3>
           <div className="liucai-ai-card__explanation">
             <SafeMarkdown>{props.state.explanation.explanation}</SafeMarkdown>
           </div>
@@ -175,6 +189,9 @@ export function AiExplanationCard(props: {
                     ? props.copy.aiHideExample
                     : props.copy.aiExample}
             </button>
+            <button data-action="secondary" disabled title={props.copy.aiThoughtCardLater}>
+              {props.copy.aiThoughtCard}
+            </button>
             <button
               data-action="primary"
               disabled={!props.canAppend || appendStatus === "saving" || appendStatus === "saved"}
@@ -185,9 +202,6 @@ export function AiExplanationCard(props: {
                 : appendStatus === "saved"
                   ? props.copy.aiAppended
                   : props.copy.aiAppendNote}
-            </button>
-            <button data-action="secondary" disabled title={props.copy.aiThoughtCardLater}>
-              {props.copy.aiThoughtCard}
             </button>
           </div>
           {appendStatus === "failed" ? (
@@ -413,15 +427,10 @@ function HighlightSidebarItem(props: {
           <span className="liucai-sidebar-item__text">{props.record.text}</span>
         </button>
         {props.record.note.trim() ? (
-          <div className="liucai-sidebar-item__note">
-            <div className="liucai-sidebar-item__note-label">
-              <NotePencilIcon aria-hidden weight="regular" />
-              <span>{props.copy.note}</span>
-            </div>
-            <div className="liucai-sidebar-item__note-body">
-              <SafeMarkdown>{props.record.note.trim()}</SafeMarkdown>
-            </div>
-          </div>
+          <section aria-label={props.copy.note} className="liucai-sidebar-item__note">
+            <span aria-hidden="true" className="liucai-sidebar-item__note-stamp">注</span>
+            <SafeMarkdown>{props.record.note.trim()}</SafeMarkdown>
+          </section>
         ) : null}
         {tags.length > 0 ? (
           <div className="liucai-sidebar-item__tags">

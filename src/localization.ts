@@ -427,7 +427,7 @@ const CONTENT_COPY: Record<ResolvedLocale, ContentCopy> = {
     saveFailed: "Could not save. Try again.",
     aiLoading: "Understanding this selection…",
     aiTitle: "Quick AI explanation",
-    aiExample: "Give me an example 🌰",
+    aiExample: "Example",
     aiHideExample: "Hide example",
     aiExampleLoading: "Thinking of an example…",
     aiExampleFailed: "Example failed — try again",

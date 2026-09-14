@@ -53,6 +53,12 @@ export class ContentMounts {
     return node;
   }
 
+  updatePopover(children: ReactNode): HTMLElement | null {
+    if (!this.popover) return null;
+    this.popover.root.render(children);
+    return this.popover.node;
+  }
+
   fitPopoverInViewport(node: HTMLElement): void {
     window.requestAnimationFrame(() => {
       const margin = 8;

@@ -16,3 +16,14 @@ test("updates an existing sidebar React root without unmounting it", async () =>
   assert.match(method, /this\.sidebar\.root\.render\(children\)/);
   assert.doesNotMatch(method, /this\.hideSidebar\(\)/);
 });
+
+test("updates an existing popover root for streaming content", async () => {
+  const source = await readFile(new URL("../src/contentMount.tsx", import.meta.url), "utf8");
+  const method = source.match(
+    /updatePopover\(children: ReactNode\): HTMLElement \| null \{(?<body>[\s\S]*?)\n  \}/,
+  )?.groups?.body;
+
+  assert.ok(method);
+  assert.match(method, /this\.popover\.root\.render\(children\)/);
+  assert.doesNotMatch(method, /hidePopover|unmount/);
+});
