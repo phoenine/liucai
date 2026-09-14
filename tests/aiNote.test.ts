@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { appendNote, formatAiExplanationNote, MAX_NOTE_LENGTH } from "../src/aiNote.ts";
+import { appendNote, formatAiExplanationNote, MAX_NOTE_LENGTH } from "../src/ai/aiNote.ts";
 
 const explanation = {
   concept: "检索增强生成",

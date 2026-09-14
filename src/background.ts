@@ -4,9 +4,8 @@ import {
   getHighlight,
   putHighlight,
   upsertPage,
-} from "./db";
+} from "./storage/db";
 import {
-  AI_AUTH_STATE_STORAGE_KEY,
   isAiCancelRequest,
   isAiExampleRequest,
   isAiExplainRequest,
@@ -21,22 +20,22 @@ import {
   type AiTestConnectionRequest,
   type SyncRequest,
   type SyncStatus,
-} from "./messages";
+} from "./shared/messages";
 import {
   explainSelection,
   generateExample,
   testAiConnection,
   type AiExplanationDependencies,
-} from "./aiExplanation";
-import { AiRequestRegistry } from "./aiRequestRegistry";
-import { getActiveLlmConnection, loadLlmSettings } from "./llmSettings";
-import { getSyncStatus, initializeSync, retrySync, signIn, signOut, signUp, triggerSync } from "./sync";
+} from "./ai/aiExplanation";
+import { AiRequestRegistry } from "./ai/aiRequestRegistry";
+import { getActiveLlmConnection, loadLlmSettings } from "./settings/llmSettings";
+import { getSyncStatus, initializeSync, retrySync, signIn, signOut, signUp, triggerSync } from "./sync/sync";
 
 chrome.runtime.onInstalled.addListener(() => {
   console.info("六彩已安装：当前版本使用扩展 IndexedDB 保存网页高亮和批注。");
 });
 
-initializeSync();
+const localDatabaseReady = initializeSync();
 
 /** At most one visible model request per tab/document, without cross-tab cancellation. */
 const aiRequests = new AiRequestRegistry();
@@ -75,6 +74,7 @@ async function handleRequest(
   request: StorageRequest | SyncRequest | AiExplainRequest | AiExampleRequest | AiTestConnectionRequest | AiCancelRequest,
   sender: chrome.runtime.MessageSender,
 ): Promise<unknown> {
+  await localDatabaseReady;
   if (isAiCancelRequest(request)) {
     const contextKey = aiContextKey(sender);
     aiRequests.cancel(contextKey, request.requestId);
@@ -98,17 +98,7 @@ async function handleRequest(
     }
   }
   if (isSyncRequest(request)) {
-    const status = await handleSyncRequest(request);
-    if (
-      request.type === "LIUCAI_SYNC_SIGN_IN"
-      || request.type === "LIUCAI_SYNC_SIGN_UP"
-      || request.type === "LIUCAI_SYNC_SIGN_OUT"
-    ) {
-      await chrome.storage.local.set({
-        [AI_AUTH_STATE_STORAGE_KEY]: status.signedIn,
-      });
-    }
-    return status;
+    return handleSyncRequest(request);
   }
   const result = await handleStorageRequest(request);
   if (isMutationRequest(request)) void triggerSync().catch(() => undefined);

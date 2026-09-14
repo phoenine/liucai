@@ -3,7 +3,7 @@ import test from "node:test";
 import {
   getSelectionToolbarKind,
   getVisibleSelectionToolbarKind,
-} from "../src/selectionIntent.ts";
+} from "../src/content/selectionIntent.ts";
 
 test("hides an AI-only learning toolbar while signed out", () => {
   assert.equal(getVisibleSelectionToolbarKind("learn", false), null);

@@ -1,5 +1,5 @@
-import type { ResolvedLocale } from "./localization";
-import type { AiExplanation } from "./messages";
+import type { ResolvedLocale } from "../shared/localization";
+import type { AiExplanation } from "../shared/messages";
 
 export function formatAiExplanationNote(
   explanation: AiExplanation,

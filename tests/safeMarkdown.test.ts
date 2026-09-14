@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { SafeMarkdown } from "../src/safeMarkdown.ts";
+import { SafeMarkdown } from "../src/content/safeMarkdown.ts";
 
 function html(source: string): string {
   return renderToStaticMarkup(createElement(SafeMarkdown, { children: source }));

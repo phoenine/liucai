@@ -37,16 +37,10 @@ select {
 }
 
 .lc-options__logo {
-  align-items: center;
-  background: #0f172a;
-  border-radius: 16px;
-  color: #ffffff;
-  display: flex;
+  display: block;
   flex: 0 0 auto;
-  font-size: 23px;
-  font-weight: 800;
   height: 48px;
-  justify-content: center;
+  object-fit: contain;
   width: 48px;
 }
 

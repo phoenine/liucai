@@ -61,7 +61,7 @@ AI 只在主动点击后请求，不会因划选、悬停或打开页面自动�
 
 也可以在 Popup 中点击“立即同步”。新电脑登录同一账号后，会从 Supabase 下载云端数据并恢复到本地。尚未上传成功的本地数据如果被删除，则无法从云端恢复。
 
-首版中，一个本地数据库只绑定一个 Supabase 账号，避免退出后误将同一份本地数据上传到其他账号。
+访客与每个 Supabase 账号的高亮、批注、待同步队列和同步游标分别保存在独立的 IndexedDB 中。退出或切换账号时，扩展会切换到对应的本地数据库，不会跨账号共用内容数据。升级前已经绑定账号的旧数据库会自动复制到该账号的新数据库；旧库保留为可恢复副本。界面偏好、站点开关和模型连接配置仍是当前浏览器级设置。
 
 ## 安装
 
@@ -98,6 +98,15 @@ npm run package
 - `npm run package`：生成 `artifacts/liucai-extension-v<version>.zip`
 - ZIP 根目录直接包含 `manifest.json`，不包含 source map
 
+`src/` 根目录只保留 background、content、popup、options 构建入口及其样式；内部模块按职责放在：
+
+- `content/`：页面生命周期、交互、DOM 与内容 UI
+- `storage/`：IndexedDB 与 content/background 存储协议
+- `sync/`：Supabase 客户端和同步协议
+- `ai/`：模型请求、流式响应和 AI 批注
+- `settings/`：模型与站点设置
+- `shared/`：跨入口共享的类型、消息、偏好和本地化
+
 ## 当前限制
 
 - 仅支持桌面版 Chrome 和普通网页正文。
@@ -106,7 +115,7 @@ npm run package
 - 跨设备变化不是实时推送；空闲设备最多约 5 分钟后拉取。
 - AI 仅对登录用户开放，并要求模型服务支持 OpenAI Responses API。
 - 思考卡片和回忆遮罩尚未实现。
-- 尚未实现多账号本地隔离和 Obsidian 自动同步。
+- 尚未实现访客数据导入账号和 Obsidian 自动同步。
 
 ## 数据与安全
 

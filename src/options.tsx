@@ -9,7 +9,7 @@ import {
 } from "@phosphor-icons/react";
 import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { createRoot } from "react-dom/client";
-import { getOptionsCopy, resolveInterfaceLocale } from "./localization";
+import { getOptionsCopy, resolveInterfaceLocale } from "./shared/localization";
 import {
   DEFAULT_LLM_SETTINGS,
   getActiveLlmConnection,
@@ -19,17 +19,17 @@ import {
   saveLlmSettings,
   type LlmProvider,
   type LlmSettingsV1,
-} from "./llmSettings";
-import type { StorageResponse } from "./messages";
+} from "./settings/llmSettings";
+import type { StorageResponse } from "./shared/messages";
 import {
   DEFAULT_PREFERENCES,
   loadPreferences,
   savePreferences,
   type InterfaceLanguage,
   type LiucaiPreferencesV1,
-} from "./preferences";
-import { HIGHLIGHT_ACCENT } from "./highlightTooltip";
-import type { HighlightColor } from "./types";
+} from "./shared/preferences";
+import { HIGHLIGHT_ACCENT } from "./content/highlightTooltip";
+import type { HighlightColor } from "./shared/types";
 import "./options.css";
 
 const COLOR_OPTIONS: HighlightColor[] = ["gold", "mint", "coral"];
@@ -171,7 +171,7 @@ function OptionsApp() {
     <main className="lc-options">
       <header className="lc-options__header">
         <div className="lc-options__brand">
-          <div aria-hidden="true" className="lc-options__logo">六</div>
+          <img alt="" aria-hidden="true" className="lc-options__logo" src="icon128.png" />
           <div>
             <p className="lc-options__eyebrow">六彩 Liucai</p>
             <h1>{copy.settings}</h1>

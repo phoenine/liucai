@@ -1,5 +1,5 @@
-import type { StorageRequest, StorageResponse } from "./messages";
-import type { HighlightRecord, PageRecord } from "./types";
+import type { StorageRequest, StorageResponse } from "../shared/messages";
+import type { HighlightRecord, PageRecord } from "../shared/types";
 
 async function sendStorageRequest<T>(request: StorageRequest): Promise<T> {
   const response = await chrome.runtime.sendMessage(request) as StorageResponse<T> | undefined;

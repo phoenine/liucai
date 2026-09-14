@@ -28,15 +28,10 @@ body {
 }
 
 .lc-popup__logo {
-  align-items: center;
-  background: #0f172a;
-  border-radius: 14px;
-  color: #fff;
-  display: flex;
-  font-size: 20px;
-  font-weight: 800;
+  display: block;
+  flex: 0 0 auto;
   height: 42px;
-  justify-content: center;
+  object-fit: contain;
   width: 42px;
 }
 

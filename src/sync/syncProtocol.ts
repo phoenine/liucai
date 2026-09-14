@@ -5,7 +5,7 @@ import type {
   PageRecord,
   RemoteChange,
   SyncBatchResult,
-} from "./types";
+} from "../shared/types";
 
 export function toRemoteMutations(mutations: OutboxMutation[]) {
   return mutations.map(({ mutationId, entityType, entityId, operation, payload }) => ({

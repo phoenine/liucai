@@ -1,5 +1,5 @@
 import { isDisplayBlockTag } from "./domTags.ts";
-import type { HighlightRecord } from "./types";
+import type { HighlightRecord } from "../shared/types";
 
 export function applyHighlight(range: Range, highlight: HighlightRecord): HTMLElement[] {
   const groups = groupTextNodesByBlock(collectTextNodes(range));

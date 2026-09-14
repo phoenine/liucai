@@ -7,13 +7,13 @@ import type {
   StorageResponse,
   SyncRequest,
   SyncStatus,
-} from "./messages";
+} from "./shared/messages";
 import {
   getPopupCopy,
   resolveInterfaceLocale,
   type PopupCopy,
-} from "./localization";
-import { DEFAULT_PREFERENCES, loadPreferences } from "./preferences";
+} from "./shared/localization";
+import { DEFAULT_PREFERENCES, loadPreferences } from "./shared/preferences";
 import "./popup.css";
 
 type LoadState =
@@ -114,7 +114,7 @@ function PopupApp() {
     <main className="lc-popup">
       <header className="lc-popup__header">
         <div className="lc-popup__brand">
-          <div className="lc-popup__logo">六</div>
+          <img alt="" aria-hidden="true" className="lc-popup__logo" src="icon128.png" />
           <div>
             <h1>六彩 Liucai</h1>
             <p>{copy.tagline}</p>

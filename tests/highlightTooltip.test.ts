@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { clientRectNearPoint, placeTooltip, TOOLTIP_COLORS, HIGHLIGHT_SOFT } from "../src/highlightTooltip.ts";
+import { clientRectNearPoint, placeTooltip, TOOLTIP_COLORS, HIGHLIGHT_SOFT } from "../src/content/highlightTooltip.ts";
 
 test("places a tooltip above the highlight when space is available", () => {
   assert.deepEqual(

@@ -3,7 +3,7 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 async function controllerSource(): Promise<string> {
-  return readFile(new URL("../src/contentController.tsx", import.meta.url), "utf8");
+  return readFile(new URL("../src/content/contentController.tsx", import.meta.url), "utf8");
 }
 
 test("re-activates a page whose URL turned into a same-canonical variant mid-switch", async () => {
@@ -29,7 +29,7 @@ test("sidebar refresh bails out once the page is no longer live", async () => {
 
 test("keeps the note editor open while it holds unsaved edits", async () => {
   const controller = await controllerSource();
-  const ui = await readFile(new URL("../src/contentUi.tsx", import.meta.url), "utf8");
+  const ui = await readFile(new URL("../src/content/contentUi.tsx", import.meta.url), "utf8");
 
   // A plain page click used to unmount the editor and discard whatever was typed.
   assert.match(controller, /if \(this\.editorDirty\) return;/);
@@ -39,7 +39,7 @@ test("keeps the note editor open while it holds unsaved edits", async () => {
 });
 
 test("reports a failed note save instead of failing silently", async () => {
-  const ui = await readFile(new URL("../src/contentUi.tsx", import.meta.url), "utf8");
+  const ui = await readFile(new URL("../src/content/contentUi.tsx", import.meta.url), "utf8");
   const controller = await controllerSource();
 
   assert.match(ui, /setSaveStatus\("failed"\)/);
@@ -83,7 +83,7 @@ test("drops the tooltip when the viewport moves and aborts model work on close",
 test("correlates streamed AI updates and reuses the open popover", async () => {
   const controller = await controllerSource();
   const background = await readFile(new URL("../src/background.ts", import.meta.url), "utf8");
-  const ui = await readFile(new URL("../src/contentUi.tsx", import.meta.url), "utf8");
+  const ui = await readFile(new URL("../src/content/contentUi.tsx", import.meta.url), "utf8");
 
   assert.match(background, /LIUCAI_AI_STREAM_UPDATE/);
   assert.match(background, /await progress\.flush\(\)/);

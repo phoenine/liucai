@@ -1,4 +1,4 @@
-import type { HighlightColor } from "./types";
+import type { HighlightColor } from "../shared/types";
 
 const VIEWPORT_MARGIN = 8;
 const ANCHOR_GAP = 8;

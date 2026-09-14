@@ -12,13 +12,14 @@ import {
   SelectionToolbar,
   type EditorFocus,
 } from "./contentUi";
-import { appendNote, formatAiExplanationNote } from "./aiNote";
+import { appendNote, formatAiExplanationNote } from "../ai/aiNote";
 import { createSelectorFromRange, LIUCAI_UI_SELECTOR, rangesFromSelectors } from "./domText";
 import { applyHighlight, removeHighlightFromDom, updateHighlightAttributes } from "./highlightDom";
 import { HoverRequestTracker } from "./hoverRequest";
-import { generateUuid } from "./id";
+import { generateUuid } from "../shared/id";
 import {
   AI_AUTH_STATE_STORAGE_KEY,
+  LOCAL_DATABASE_SCOPE_STORAGE_KEY,
   isAiStreamUpdate,
   isPageStatusRequest,
   isSetSiteDisabledRequest,
@@ -27,7 +28,7 @@ import {
   type AiExample,
   type StorageResponse,
   type SyncStatus,
-} from "./messages";
+} from "../shared/messages";
 import {
   createObsidianExportFilename,
   formatObsidianHighlight,
@@ -40,12 +41,12 @@ import {
   resolveInterfaceLocale,
   type ContentCopy,
   type ResolvedLocale,
-} from "./localization";
+} from "../shared/localization";
 import {
   normalizePreferences,
   PREFERENCES_STORAGE_KEY,
-} from "./preferences";
-import { isHostnameDisabled, setHostnameDisabled } from "./sitePreferences";
+} from "../shared/preferences";
+import { isHostnameDisabled, setHostnameDisabled } from "../settings/sitePreferences";
 import {
   getSelectionToolbarKind,
   getVisibleSelectionToolbarKind,
@@ -57,8 +58,8 @@ import {
   getHighlight,
   putHighlight,
   upsertPage,
-} from "./storageClient";
-import type { HighlightColor, HighlightRecord, PageRecord } from "./types";
+} from "../storage/storageClient";
+import type { HighlightColor, HighlightRecord, PageRecord } from "../shared/types";
 import {
   createPageIdentity,
   hasPageIdentityChanged,
@@ -279,9 +280,21 @@ export class ContentController {
       if (Object.keys(changes).length === 1) return;
     }
 
+    if (changes[LOCAL_DATABASE_SCOPE_STORAGE_KEY]) {
+      // A cached page or editor belongs to the previous database. Reusing either after an account
+      // switch could create a highlight whose page exists only in another user's local store.
+      this.pagePromise = null;
+      this.editorDirty = false;
+      this.currentSelectionRange = null;
+      this.mounts.hideToolbar();
+      this.mounts.hidePopover();
+    }
+
     const task = changes["liucai.sync.changedAt"]
       ? () => this.refreshSyncedPage()
-      : () => this.syncActivation();
+      : changes[LOCAL_DATABASE_SCOPE_STORAGE_KEY]
+        ? () => this.refreshSyncedPage()
+        : () => this.syncActivation();
     void this.transitions
       .run(task)
       .catch((error) => this.reportError("site setting sync", error));

@@ -9,8 +9,8 @@ import {
   normalizeLlmSettings,
   OPENAI_BASE_URL,
   saveLlmSettings,
-} from "../src/llmSettings.ts";
-import { PREFERENCES_STORAGE_KEY } from "../src/preferences.ts";
+} from "../src/settings/llmSettings.ts";
+import { PREFERENCES_STORAGE_KEY } from "../src/shared/preferences.ts";
 
 class MemoryStorage {
   values: Record<string, unknown> = {};

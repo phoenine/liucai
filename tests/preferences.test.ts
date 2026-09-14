@@ -7,7 +7,7 @@ import {
   PREFERENCES_STORAGE_KEY,
   savePreferences,
   type PreferenceStorage,
-} from "../src/preferences.ts";
+} from "../src/shared/preferences.ts";
 
 class MemoryPreferenceStorage implements PreferenceStorage {
   values: Record<string, unknown> = {};

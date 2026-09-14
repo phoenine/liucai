@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { canonicalizeUrl, createPageIdentity, hasPageIdentityChanged } from "../src/url.ts";
+import { canonicalizeUrl, createPageIdentity, hasPageIdentityChanged } from "../src/content/url.ts";
 
 test("removes tracking parameters but preserves from", () => {
   assert.equal(

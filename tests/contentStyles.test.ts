@@ -5,7 +5,7 @@ import {
   HIGHLIGHT_ACCENT,
   HIGHLIGHT_MARKER,
   HIGHLIGHT_SOFT,
-} from "../src/highlightTooltip.ts";
+} from "../src/content/highlightTooltip.ts";
 
 test("uses a light matching background for each sidebar highlight card", async () => {
   const css = await readFile(new URL("../public/content.css", import.meta.url), "utf8");
@@ -50,7 +50,7 @@ test("shows complete highlight text and notes in sidebar cards", async () => {
 
 test("visually separates readable sidebar notes from excerpt text", async () => {
   const css = await readFile(new URL("../public/content.css", import.meta.url), "utf8");
-  const ui = await readFile(new URL("../src/contentUi.tsx", import.meta.url), "utf8");
+  const ui = await readFile(new URL("../src/content/contentUi.tsx", import.meta.url), "utf8");
   const textRule = css.match(/\.liucai-sidebar-item__text\s*\{[^}]*\}/s)?.[0];
   const noteRule = css.match(/\.liucai-sidebar-item__note\s*\{[^}]*\}/s)?.[0];
   const stampRule = css.match(/\.liucai-sidebar-item__note-stamp\s*\{[^}]*\}/s)?.[0];

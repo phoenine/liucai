@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { ContentTransitionQueue } from "../src/contentTransitionQueue.ts";
+import { ContentTransitionQueue } from "../src/content/contentTransitionQueue.ts";
 
 test("runs content transitions in order", async () => {
   const queue = new ContentTransitionQueue();

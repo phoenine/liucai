@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { continueNoteList } from "../src/noteFormat.ts";
+import { continueNoteList } from "../src/content/noteFormat.ts";
 
 test("continues ordered and unordered lists at the end of an item", () => {
   assert.deepEqual(continueNoteList("1. 定位问题", 7, 7), {

@@ -1,6 +1,7 @@
 import type { HighlightRecord } from "./types";
 
 export const AI_AUTH_STATE_STORAGE_KEY = "liucai.ai.signedIn";
+export const LOCAL_DATABASE_SCOPE_STORAGE_KEY = "liucai.storage.scope.v1";
 
 export type PageStatusRequest = { type: "LIUCAI_GET_PAGE_STATUS" };
 export type SetSiteDisabledRequest = { type: "LIUCAI_SET_SITE_DISABLED"; disabled: boolean };

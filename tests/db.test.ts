@@ -3,12 +3,12 @@ import { Buffer } from "node:buffer";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
 import { build } from "esbuild";
-import type { HighlightRecord, PageRecord } from "../src/types.ts";
+import type { HighlightRecord, PageRecord } from "../src/shared/types.ts";
 
 const root = fileURLToPath(new URL("..", import.meta.url));
 const bundle = await build({
   stdin: {
-    contents: 'import "fake-indexeddb/auto"; export * from "./src/db.ts";',
+    contents: 'import "fake-indexeddb/auto"; export * from "./src/storage/db.ts";',
     resolveDir: root,
     sourcefile: "db-test-entry.ts",
   },
@@ -19,9 +19,10 @@ const bundle = await build({
   write: false,
 });
 const moduleUrl = `data:text/javascript;base64,${Buffer.from(bundle.outputFiles[0].text).toString("base64")}`;
-const storage = await import(moduleUrl) as typeof import("../src/db.ts");
+const storage = await import(moduleUrl) as typeof import("../src/storage/db.ts");
 
 test.beforeEach(async () => {
+  await storage.activateLocalDatabase(null);
   await storage.db.delete();
   await storage.db.open();
 });
@@ -212,16 +213,39 @@ test("preserves a pending local page when the server canonical page has another 
   assert.equal(await storage.db.pages.get("server-page-id"), undefined);
 });
 
-test("binds a local database to one cloud account", async () => {
+test("keeps guest and cloud accounts in separate local databases", async () => {
+  await storage.upsertPage("https://example.com/guest", "https://example.com/guest", "Guest");
+  const guest = storage.db;
+
+  const accountA = await storage.bindLocalDatabaseToUser("user-a");
+  await accountA.delete();
+  await accountA.open();
   await storage.bindLocalDatabaseToUser("user-a");
-  await storage.bindLocalDatabaseToUser("user-a");
-  await assert.rejects(
-    storage.bindLocalDatabaseToUser("user-b"),
-    /已绑定其他账号/,
-  );
+  await storage.upsertPage("https://example.com/a", "https://example.com/a", "A");
+
+  const accountB = await storage.bindLocalDatabaseToUser("user-b");
+  await accountB.delete();
+  await accountB.open();
+  await storage.bindLocalDatabaseToUser("user-b");
+  assert.equal(await storage.db.pages.count(), 0);
+  await storage.upsertPage("https://example.com/b", "https://example.com/b", "B");
+  assert.equal(storage.isActiveLocalDatabase(accountA, "user-a"), false);
+  assert.equal(storage.isActiveLocalDatabase(accountB, "user-b"), true);
+
+  await storage.activateLocalDatabase("user-a");
+  assert.deepEqual((await storage.db.pages.toArray()).map((page) => page.title), ["A"]);
+  await storage.activateLocalDatabase(null);
+  assert.deepEqual((await storage.db.pages.toArray()).map((page) => page.title), ["Guest"]);
+
+  await accountA.delete();
+  await accountB.delete();
+  await guest.open();
 });
 
 test("first account binding queues a complete page-first bootstrap exactly once", async () => {
+  const account = await storage.activateLocalDatabase("bootstrap-user");
+  await account.delete();
+  await account.open();
   const page = await storage.upsertPage(
     "https://example.com/article",
     "https://example.com/article",
@@ -233,16 +257,17 @@ test("first account binding queues a complete page-first bootstrap exactly once"
   await storage.db.outbox.clear();
   await storage.putHighlight(highlight);
 
-  await storage.bindLocalDatabaseToUser("user-a");
+  await storage.bindLocalDatabaseToUser("bootstrap-user");
 
   const firstBatch = await storage.getOutboxBatch();
   assert.deepEqual(firstBatch.map((mutation) => mutation.entityType), ["page", "highlight"]);
   assert.equal(firstBatch.filter((mutation) => mutation.entityId === page.id).length, 1);
   assert.equal(firstBatch.filter((mutation) => mutation.entityId === highlight.id).length, 1);
-  assert.equal(await storage.getSyncCursor("user-a"), 0);
+  assert.equal(await storage.getSyncCursor("bootstrap-user"), 0);
 
-  await storage.bindLocalDatabaseToUser("user-a");
+  await storage.bindLocalDatabaseToUser("bootstrap-user");
   assert.equal(await storage.db.outbox.count(), 2);
+  await account.delete();
 });
 
 test("ignores the recorded backoff when handed a far-future now", async () => {

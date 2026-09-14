@@ -4,7 +4,7 @@ import test from "node:test";
 
 test("updates an existing sidebar React root without unmounting it", async () => {
   const source = await readFile(
-    new URL("../src/contentMount.tsx", import.meta.url),
+    new URL("../src/content/contentMount.tsx", import.meta.url),
     "utf8",
   );
   const method = source.match(
@@ -18,7 +18,7 @@ test("updates an existing sidebar React root without unmounting it", async () =>
 });
 
 test("updates an existing popover root for streaming content", async () => {
-  const source = await readFile(new URL("../src/contentMount.tsx", import.meta.url), "utf8");
+  const source = await readFile(new URL("../src/content/contentMount.tsx", import.meta.url), "utf8");
   const method = source.match(
     /updatePopover\(children: ReactNode\): HTMLElement \| null \{(?<body>[\s\S]*?)\n  \}/,
   )?.groups?.body;
