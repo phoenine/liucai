@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { readResponseOutput } from "../src/responseStream.ts";
+import { readResponseOutput } from "../src/ai/responseStream.ts";
 
 function eventStream(chunks: string[]): Response {
   const encoder = new TextEncoder();

@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 
 test("sidebar presents list title and count before the secondary page title", async () => {
-  const source = await readFile(new URL("../src/contentUi.tsx", import.meta.url), "utf8");
+  const source = await readFile(new URL("../src/content/contentUi.tsx", import.meta.url), "utf8");
   const sidebar = source.slice(
     source.indexOf("export function HighlightSidebar"),
     source.indexOf("function HighlightSidebarItem"),
@@ -24,7 +24,7 @@ test("sidebar presents list title and count before the secondary page title", as
 });
 
 test("sidebar presents export action below page title while close remains in the header", async () => {
-  const source = await readFile(new URL("../src/contentUi.tsx", import.meta.url), "utf8");
+  const source = await readFile(new URL("../src/content/contentUi.tsx", import.meta.url), "utf8");
   const sidebar = source.slice(
     source.indexOf("export function HighlightSidebar"),
     source.indexOf("function HighlightSidebarItem"),
@@ -44,7 +44,7 @@ test("sidebar presents export action below page title while close remains in the
 });
 
 test("sidebar card keeps tags above actions without an extra footer wrapper", async () => {
-  const source = await readFile(new URL("../src/contentUi.tsx", import.meta.url), "utf8");
+  const source = await readFile(new URL("../src/content/contentUi.tsx", import.meta.url), "utf8");
   const item = source.slice(
     source.indexOf("function HighlightSidebarItem"),
     source.indexOf("export function HighlightTooltip"),

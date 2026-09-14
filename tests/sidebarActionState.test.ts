@@ -4,7 +4,7 @@ import {
   nextDeleteState,
   runCopyAction,
   type CopyStatus,
-} from "../src/sidebarActionState.ts";
+} from "../src/content/sidebarActionState.ts";
 
 test("reports copying before the action resolves and copied after success", async () => {
   const statuses: CopyStatus[] = [];

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { AiRequestRegistry } from "../src/aiRequestRegistry.ts";
+import { AiRequestRegistry } from "../src/ai/aiRequestRegistry.ts";
 
 test("cancels only the matching request in the matching tab", () => {
   const registry = new AiRequestRegistry();

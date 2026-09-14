@@ -3,7 +3,7 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 test("content UI reads all interactive labels from localized copy", async () => {
-  const source = await readFile(new URL("../src/contentUi.tsx", import.meta.url), "utf8");
+  const source = await readFile(new URL("../src/content/contentUi.tsx", import.meta.url), "utf8");
 
   assert.match(source, /copy: ContentCopy/);
   assert.match(source, /props\.copy\.sidebarTitle/);
@@ -18,7 +18,7 @@ test("content UI reads all interactive labels from localized copy", async () => 
 });
 
 test("content controller applies language changes to mounted page UI", async () => {
-  const source = await readFile(new URL("../src/contentController.tsx", import.meta.url), "utf8");
+  const source = await readFile(new URL("../src/content/contentController.tsx", import.meta.url), "utf8");
 
   assert.match(source, /applyPreferences\(/);
   assert.match(source, /languageChanged && this\.pageActive/);
@@ -27,8 +27,8 @@ test("content controller applies language changes to mounted page UI", async () 
 });
 
 test("pointer targeting treats the highlight tooltip as UI without changing text offsets", async () => {
-  const controller = await readFile(new URL("../src/contentController.tsx", import.meta.url), "utf8");
-  const domText = await readFile(new URL("../src/domText.ts", import.meta.url), "utf8");
+  const controller = await readFile(new URL("../src/content/contentController.tsx", import.meta.url), "utf8");
+  const domText = await readFile(new URL("../src/content/domText.ts", import.meta.url), "utf8");
 
   assert.match(controller, /LIUCAI_UI_SELECTOR\},?\.liucai-highlight-tooltip/);
   assert.match(controller, /startedInUi = this\.mouseDownStartedInUi;\s*this\.mouseDownStartedInUi = false;/s);

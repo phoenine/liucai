@@ -5,8 +5,8 @@ import {
   createObsidianExportFilename,
   formatObsidianHighlight,
   formatObsidianPageExport,
-} from "../src/obsidianExport.ts";
-import type { HighlightColor, HighlightRecord } from "../src/types.ts";
+} from "../src/content/obsidianExport.ts";
+import type { HighlightColor, HighlightRecord } from "../src/shared/types.ts";
 
 function makeRecord(overrides: Partial<HighlightRecord> = {}): HighlightRecord {
   return {
@@ -113,7 +113,7 @@ test("omits empty sections and normalizes spaces in Obsidian tags", () => {
 
 test("uses the Obsidian formatter for sidebar copies", async () => {
   const source = await readFile(
-    new URL("../src/contentController.tsx", import.meta.url),
+    new URL("../src/content/contentController.tsx", import.meta.url),
     "utf8",
   );
 

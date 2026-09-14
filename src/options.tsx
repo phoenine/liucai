@@ -9,7 +9,7 @@ import {
 } from "@phosphor-icons/react";
 import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { createRoot } from "react-dom/client";
-import { getOptionsCopy, resolveInterfaceLocale } from "./localization";
+import { getOptionsCopy, resolveInterfaceLocale } from "./shared/localization";
 import {
   DEFAULT_LLM_SETTINGS,
   getActiveLlmConnection,
@@ -19,17 +19,17 @@ import {
   saveLlmSettings,
   type LlmProvider,
   type LlmSettingsV1,
-} from "./llmSettings";
-import type { StorageResponse } from "./messages";
+} from "./settings/llmSettings";
+import type { StorageResponse } from "./shared/messages";
 import {
   DEFAULT_PREFERENCES,
   loadPreferences,
   savePreferences,
   type InterfaceLanguage,
   type LiucaiPreferencesV1,
-} from "./preferences";
-import { HIGHLIGHT_ACCENT } from "./highlightTooltip";
-import type { HighlightColor } from "./types";
+} from "./shared/preferences";
+import { HIGHLIGHT_ACCENT } from "./content/highlightTooltip";
+import type { HighlightColor } from "./shared/types";
 import "./options.css";
 
 const COLOR_OPTIONS: HighlightColor[] = ["gold", "mint", "coral"];

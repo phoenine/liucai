@@ -1,8 +1,8 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
-import { updateHighlightAttributes } from "../src/highlightDom.ts";
-import type { HighlightRecord } from "../src/types.ts";
+import { updateHighlightAttributes } from "../src/content/highlightDom.ts";
+import type { HighlightRecord } from "../src/shared/types.ts";
 
 test("updates tooltip presence flags without retaining tooltip content in the DOM", () => {
   const spans = [
@@ -73,7 +73,7 @@ test("updates tooltip presence flags without retaining tooltip content in the DO
 
 test("does not write tooltip content into highlight DOM attributes", async () => {
   const source = await readFile(
-    new URL("../src/highlightDom.ts", import.meta.url),
+    new URL("../src/content/highlightDom.ts", import.meta.url),
     "utf8",
   );
 
@@ -82,7 +82,7 @@ test("does not write tooltip content into highlight DOM attributes", async () =>
 
 test("does not wrap whitespace-only ranges or put --last on blank spans", async () => {
   const source = await readFile(
-    new URL("../src/highlightDom.ts", import.meta.url),
+    new URL("../src/content/highlightDom.ts", import.meta.url),
     "utf8",
   );
 
@@ -93,7 +93,7 @@ test("does not wrap whitespace-only ranges or put --last on blank spans", async 
 
 test("uses note and tag presence flags to select tooltip highlights", async () => {
   const source = await readFile(
-    new URL("../src/contentController.tsx", import.meta.url),
+    new URL("../src/content/contentController.tsx", import.meta.url),
     "utf8",
   );
 
@@ -106,7 +106,7 @@ test("uses note and tag presence flags to select tooltip highlights", async () =
 
 test("keeps tooltip visible when the pointer moves between spans of the same highlight", async () => {
   const source = await readFile(
-    new URL("../src/contentController.tsx", import.meta.url),
+    new URL("../src/content/contentController.tsx", import.meta.url),
     "utf8",
   );
 
@@ -115,7 +115,7 @@ test("keeps tooltip visible when the pointer moves between spans of the same hig
 
 test("wraps a highlight range once per block without extracting content before insert", async () => {
   const source = await readFile(
-    new URL("../src/highlightDom.ts", import.meta.url),
+    new URL("../src/content/highlightDom.ts", import.meta.url),
     "utf8",
   );
 
@@ -126,9 +126,9 @@ test("wraps a highlight range once per block without extracting content before i
 
 test("classifies tags in one shared module instead of per-consumer lists", async () => {
   const [highlightSource, blockSource, tagsSource] = await Promise.all([
-    readFile(new URL("../src/highlightDom.ts", import.meta.url), "utf8"),
-    readFile(new URL("../src/rangeDisplayText.ts", import.meta.url), "utf8"),
-    readFile(new URL("../src/domTags.ts", import.meta.url), "utf8"),
+    readFile(new URL("../src/content/highlightDom.ts", import.meta.url), "utf8"),
+    readFile(new URL("../src/content/rangeDisplayText.ts", import.meta.url), "utf8"),
+    readFile(new URL("../src/content/domTags.ts", import.meta.url), "utf8"),
   ]);
 
   assert.match(tagsSource, /"BLOCKQUOTE"/);

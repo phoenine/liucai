@@ -3,7 +3,7 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 test("keeps create, learning, and management toolbars separate", async () => {
-  const source = await readFile(new URL("../src/contentUi.tsx", import.meta.url), "utf8");
+  const source = await readFile(new URL("../src/content/contentUi.tsx", import.meta.url), "utf8");
   const selection = source.match(/export function SelectionToolbar[\s\S]*?\n}\n/)?.[0];
   const learning = source.match(/export function LearningToolbar[\s\S]*?\n}\n/)?.[0];
   const management = source.match(/export function ExistingHighlightToolbar[\s\S]*?\n}\n/)?.[0];
@@ -34,7 +34,7 @@ test("keeps create, learning, and management toolbars separate", async () => {
 });
 
 test("only renders the learning toolbar for signed-in selections", async () => {
-  const source = await readFile(new URL("../src/contentController.tsx", import.meta.url), "utf8");
+  const source = await readFile(new URL("../src/content/contentController.tsx", import.meta.url), "utf8");
 
   assert.match(source, /visibleKind === "learn"/);
   assert.match(source, /getVisibleSelectionToolbarKind\(kind, signedIn\)/);
@@ -43,7 +43,7 @@ test("only renders the learning toolbar for signed-in selections", async () => {
 });
 
 test("closes a selection toolbar when the account state changes", async () => {
-  const source = await readFile(new URL("../src/contentController.tsx", import.meta.url), "utf8");
+  const source = await readFile(new URL("../src/content/contentController.tsx", import.meta.url), "utf8");
 
   assert.match(source, /changes\[AI_AUTH_STATE_STORAGE_KEY\]/);
   assert.match(source, /this\.selectionRequestId \+= 1/);
@@ -51,7 +51,7 @@ test("closes a selection toolbar when the account state changes", async () => {
 });
 
 test("reloads page highlights when the active local account database changes", async () => {
-  const source = await readFile(new URL("../src/contentController.tsx", import.meta.url), "utf8");
+  const source = await readFile(new URL("../src/content/contentController.tsx", import.meta.url), "utf8");
 
   assert.match(source, /changes\[LOCAL_DATABASE_SCOPE_STORAGE_KEY\]/);
   assert.match(source, /this\.pagePromise = null/);

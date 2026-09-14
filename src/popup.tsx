@@ -7,13 +7,13 @@ import type {
   StorageResponse,
   SyncRequest,
   SyncStatus,
-} from "./messages";
+} from "./shared/messages";
 import {
   getPopupCopy,
   resolveInterfaceLocale,
   type PopupCopy,
-} from "./localization";
-import { DEFAULT_PREFERENCES, loadPreferences } from "./preferences";
+} from "./shared/localization";
+import { DEFAULT_PREFERENCES, loadPreferences } from "./shared/preferences";
 import "./popup.css";
 
 type LoadState =

@@ -3,7 +3,7 @@ import test from "node:test";
 import {
   formatDisplayTextTokens,
   isDisplayBlockTag,
-} from "../src/rangeDisplayText.ts";
+} from "../src/content/rangeDisplayText.ts";
 
 test("keeps text from inline nodes on the same line", () => {
   assert.equal(

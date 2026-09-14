@@ -21,7 +21,7 @@ test("opens settings from an accessible popup header button", async () => {
 
 test("keeps cloud auth neutral until the stored session status is loaded", async () => {
   const popup = await readFile(new URL("../src/popup.tsx", import.meta.url), "utf8");
-  const localization = await readFile(new URL("../src/localization.ts", import.meta.url), "utf8");
+  const localization = await readFile(new URL("../src/shared/localization.ts", import.meta.url), "utf8");
 
   assert.match(popup, /syncStatus === null \? \([\s\S]*copy\.checkingSync/);
   assert.match(localization, /checkingSync: "正在检查登录状态……"/);
@@ -30,7 +30,7 @@ test("keeps cloud auth neutral until the stored session status is loaded", async
 
 test("offers browser, Chinese, and English interface language choices", async () => {
   const options = await readFile(new URL("../src/options.tsx", import.meta.url), "utf8");
-  const localization = await readFile(new URL("../src/localization.ts", import.meta.url), "utf8");
+  const localization = await readFile(new URL("../src/shared/localization.ts", import.meta.url), "utf8");
 
   assert.match(options, /\["auto", "zh-CN", "en"\]/);
   assert.match(localization, /Follow browser/);
@@ -52,7 +52,7 @@ test("builds a dedicated options script and stylesheet", async () => {
 });
 
 test("uses the configured default only for implicit note and tag highlights", async () => {
-  const controller = await readFile(new URL("../src/contentController.tsx", import.meta.url), "utf8");
+  const controller = await readFile(new URL("../src/content/contentController.tsx", import.meta.url), "utf8");
 
   assert.match(controller, /createHighlight\(color, \{ openEditor: false \}\)/);
   assert.match(controller, /createHighlight\(\s*this\.defaultAnnotationColor,\s*\{ openEditor: true, focus: "note" \}/);
@@ -61,7 +61,7 @@ test("uses the configured default only for implicit note and tag highlights", as
 
 test("offers separate LM Studio and OpenAI direct connection settings", async () => {
   const options = await readFile(new URL("../src/options.tsx", import.meta.url), "utf8");
-  const localization = await readFile(new URL("../src/localization.ts", import.meta.url), "utf8");
+  const localization = await readFile(new URL("../src/shared/localization.ts", import.meta.url), "utf8");
 
   assert.match(options, /\["lm-studio", "openai"\]/);
   assert.match(options, /loadLlmSettings/);
@@ -86,7 +86,7 @@ test("captures LLM input values before queued React state updates", async () => 
 test("offers save feedback, a real connection test, and reduced-motion press feedback", async () => {
   const options = await readFile(new URL("../src/options.tsx", import.meta.url), "utf8");
   const styles = await readFile(new URL("../src/options.css", import.meta.url), "utf8");
-  const localization = await readFile(new URL("../src/localization.ts", import.meta.url), "utf8");
+  const localization = await readFile(new URL("../src/shared/localization.ts", import.meta.url), "utf8");
 
   assert.match(options, /LIUCAI_AI_TEST_CONNECTION/);
   assert.match(options, /llmTestSuccess/);

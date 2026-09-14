@@ -4,7 +4,7 @@ import {
   getHighlight,
   putHighlight,
   upsertPage,
-} from "./db";
+} from "./storage/db";
 import {
   isAiCancelRequest,
   isAiExampleRequest,
@@ -20,16 +20,16 @@ import {
   type AiTestConnectionRequest,
   type SyncRequest,
   type SyncStatus,
-} from "./messages";
+} from "./shared/messages";
 import {
   explainSelection,
   generateExample,
   testAiConnection,
   type AiExplanationDependencies,
-} from "./aiExplanation";
-import { AiRequestRegistry } from "./aiRequestRegistry";
-import { getActiveLlmConnection, loadLlmSettings } from "./llmSettings";
-import { getSyncStatus, initializeSync, retrySync, signIn, signOut, signUp, triggerSync } from "./sync";
+} from "./ai/aiExplanation";
+import { AiRequestRegistry } from "./ai/aiRequestRegistry";
+import { getActiveLlmConnection, loadLlmSettings } from "./settings/llmSettings";
+import { getSyncStatus, initializeSync, retrySync, signIn, signOut, signUp, triggerSync } from "./sync/sync";
 
 chrome.runtime.onInstalled.addListener(() => {
   console.info("六彩已安装：当前版本使用扩展 IndexedDB 保存网页高亮和批注。");

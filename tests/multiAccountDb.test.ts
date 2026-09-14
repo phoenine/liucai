@@ -3,12 +3,12 @@ import { Buffer } from "node:buffer";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
 import { build } from "esbuild";
-import type { HighlightRecord, OutboxMutation, PageRecord } from "../src/types.ts";
+import type { HighlightRecord, OutboxMutation, PageRecord } from "../src/shared/types.ts";
 
 const root = fileURLToPath(new URL("..", import.meta.url));
 const bundle = await build({
   stdin: {
-    contents: 'import "fake-indexeddb/auto"; export * from "./src/db.ts";',
+    contents: 'import "fake-indexeddb/auto"; export * from "./src/storage/db.ts";',
     resolveDir: root,
     sourcefile: "multi-account-db-test-entry.ts",
   },
@@ -19,7 +19,7 @@ const bundle = await build({
   write: false,
 });
 const moduleUrl = `data:text/javascript;base64,${Buffer.from(bundle.outputFiles[0].text).toString("base64")}`;
-const storage = await import(moduleUrl) as typeof import("../src/db.ts");
+const storage = await import(moduleUrl) as typeof import("../src/storage/db.ts");
 
 test("migrates the legacy database to its bound account without exposing it to guests", async () => {
   const legacy = new storage.LiucaiDatabase("liucai");

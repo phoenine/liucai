@@ -5,7 +5,7 @@ import {
   getPopupCopy,
   getContentCopy,
   resolveInterfaceLocale,
-} from "../src/localization.ts";
+} from "../src/shared/localization.ts";
 
 test("resolves explicit and browser-following interface languages", () => {
   assert.equal(resolveInterfaceLocale("zh-CN", "en-US"), "zh-CN");

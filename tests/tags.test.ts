@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { parseTags } from "../src/tags.ts";
+import { parseTags } from "../src/content/tags.ts";
 
 test("normalizes and deduplicates tags", () => {
   assert.deepEqual(parseTags("#AI，Agent\nAI, 测试"), ["AI", "Agent", "测试"]);

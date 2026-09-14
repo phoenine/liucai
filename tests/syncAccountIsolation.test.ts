@@ -3,7 +3,7 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 test("settles an in-flight sync before changing the Supabase session", async () => {
-  const source = await readFile(new URL("../src/sync.ts", import.meta.url), "utf8");
+  const source = await readFile(new URL("../src/sync/sync.ts", import.meta.url), "utf8");
 
   assert.match(source, /signIn[\s\S]*?serializeAccountTransition/);
   assert.match(source, /signUp[\s\S]*?serializeAccountTransition/);
@@ -14,7 +14,7 @@ test("settles an in-flight sync before changing the Supabase session", async () 
 });
 
 test("applies a sync response only to the database captured for that account", async () => {
-  const source = await readFile(new URL("../src/sync.ts", import.meta.url), "utf8");
+  const source = await readFile(new URL("../src/sync/sync.ts", import.meta.url), "utf8");
 
   assert.match(source, /const database = await bindLocalDatabaseToUser\(user\.id\)/);
   assert.match(source, /if \(!isActiveLocalDatabase\(database, user\.id\)\) return;[\s\S]*?await applySyncBatch\(user\.id, result, database\)/);
@@ -30,7 +30,7 @@ test("waits for the startup account database before serving storage requests", a
 });
 
 test("notifies pages about the new database before starting that account's sync", async () => {
-  const source = await readFile(new URL("../src/sync.ts", import.meta.url), "utf8");
+  const source = await readFile(new URL("../src/sync/sync.ts", import.meta.url), "utf8");
 
   assert.match(source, /signIn[\s\S]*?bindOrSignOut\(data\.user\.id\)[\s\S]*?publishLocalDatabaseScope\(data\.user\)[\s\S]*?triggerSync\(true\)/);
   assert.match(source, /initializeLocalDatabase[\s\S]*?activateLocalDatabase\(user\?\.id \?\? null\)[\s\S]*?publishLocalDatabaseScope\(user\)/);

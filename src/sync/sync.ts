@@ -10,12 +10,12 @@ import {
   recordSyncFailure,
   recordSyncStateError,
   resetOutboxRetries,
-} from "./db";
+} from "../storage/db";
 import {
   AI_AUTH_STATE_STORAGE_KEY,
   LOCAL_DATABASE_SCOPE_STORAGE_KEY,
   type SyncStatus,
-} from "./messages";
+} from "../shared/messages";
 import { getSupabaseClient } from "./supabaseClient";
 import { parseSyncBatchResult, toRemoteMutations } from "./syncProtocol";
 

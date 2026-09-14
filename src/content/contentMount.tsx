@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { clientRectNearPoint, placeTooltip } from "./highlightTooltip";
-import type { HighlightColor } from "./types";
+import type { HighlightColor } from "../shared/types";
 
 type MountedRoot = { root: Root; node: HTMLElement } | null;
 

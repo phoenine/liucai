@@ -1,4 +1,4 @@
-import type { HighlightSelector } from "./types";
+import type { HighlightSelector } from "../shared/types";
 
 const IGNORED_TAGS = new Set(["SCRIPT", "STYLE", "NOSCRIPT", "TEXTAREA", "INPUT", "SELECT", "OPTION"]);
 export const LIUCAI_UI_SELECTOR = [

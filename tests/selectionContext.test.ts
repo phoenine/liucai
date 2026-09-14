@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { trimContextAroundSelection } from "../src/selectionContext.ts";
+import { trimContextAroundSelection } from "../src/content/selectionContext.ts";
 
 test("normalizes short context and keeps a long selection near the center", () => {
   assert.equal(trimContextAroundSelection("one\n  two", "two", 20), "one two");

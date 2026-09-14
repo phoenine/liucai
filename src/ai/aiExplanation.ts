@@ -4,7 +4,7 @@ import type {
   AiExplanation,
   AiExplainRequest,
   SyncStatus,
-} from "./messages";
+} from "../shared/messages";
 import { extractResponseOutputText, readResponseOutput, type ResponseTextUpdate } from "./responseStream.ts";
 
 const REQUEST_TIMEOUT_MS = 30_000;

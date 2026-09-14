@@ -10,7 +10,7 @@ import {
   isSetSiteDisabledRequest,
   isStorageRequest,
   isSyncRequest,
-} from "../src/messages.ts";
+} from "../src/shared/messages.ts";
 
 test("validates bounded AI explanation requests", () => {
   assert.equal(isAiExplainRequest({

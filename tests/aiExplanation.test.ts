@@ -8,7 +8,7 @@ import {
   testAiConnection,
   AI_CONCEPT_LIMIT,
   AI_EXPLANATION_LIMIT,
-} from "../src/aiExplanation.ts";
+} from "../src/ai/aiExplanation.ts";
 
 const explanation = {
   concept: "RAG",

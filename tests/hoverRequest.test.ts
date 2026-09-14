@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { HoverRequestTracker } from "../src/hoverRequest.ts";
+import { HoverRequestTracker } from "../src/content/hoverRequest.ts";
 
 test("accepts only the latest active highlight request", () => {
   const tracker = new HoverRequestTracker();

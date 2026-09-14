@@ -1,4 +1,4 @@
-import { ContentController } from "./contentController";
+import { ContentController } from "./content/contentController";
 
 const controller = new ContentController();
 

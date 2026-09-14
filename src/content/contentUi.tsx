@@ -10,9 +10,9 @@ import {
   XIcon,
 } from "@phosphor-icons/react";
 import { type ReactNode, useEffect, useState } from "react";
-import { MAX_NOTE_LENGTH } from "./aiNote";
-import type { ContentCopy } from "./localization";
-import type { AiExplanation } from "./messages";
+import { MAX_NOTE_LENGTH } from "../ai/aiNote";
+import type { ContentCopy } from "../shared/localization";
+import type { AiExplanation } from "../shared/messages";
 import { continueNoteList } from "./noteFormat";
 import { SafeMarkdown } from "./safeMarkdown";
 import {
@@ -23,7 +23,7 @@ import {
 } from "./sidebarActionState";
 import { HIGHLIGHT_ACCENT } from "./highlightTooltip";
 import { parseTags } from "./tags";
-import type { HighlightColor, HighlightRecord } from "./types";
+import type { HighlightColor, HighlightRecord } from "../shared/types";
 
 const COLORS: Array<{ color: HighlightColor; value: string }> = [
   { color: "gold", value: HIGHLIGHT_ACCENT.gold },

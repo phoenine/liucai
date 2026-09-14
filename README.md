@@ -98,6 +98,15 @@ npm run package
 - `npm run package`：生成 `artifacts/liucai-extension-v<version>.zip`
 - ZIP 根目录直接包含 `manifest.json`，不包含 source map
 
+`src/` 根目录只保留 background、content、popup、options 构建入口及其样式；内部模块按职责放在：
+
+- `content/`：页面生命周期、交互、DOM 与内容 UI
+- `storage/`：IndexedDB 与 content/background 存储协议
+- `sync/`：Supabase 客户端和同步协议
+- `ai/`：模型请求、流式响应和 AI 批注
+- `settings/`：模型与站点设置
+- `shared/`：跨入口共享的类型、消息、偏好和本地化
+
 ## 当前限制
 
 - 仅支持桌面版 Chrome 和普通网页正文。

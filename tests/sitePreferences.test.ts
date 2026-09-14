@@ -5,7 +5,7 @@ import {
   isHostnameDisabled,
   setHostnameDisabled,
   type SitePreferenceStorage,
-} from "../src/sitePreferences.ts";
+} from "../src/settings/sitePreferences.ts";
 
 class MemoryStorage implements SitePreferenceStorage {
   private readonly data: Record<string, unknown> = {};

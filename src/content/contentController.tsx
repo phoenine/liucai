@@ -12,11 +12,11 @@ import {
   SelectionToolbar,
   type EditorFocus,
 } from "./contentUi";
-import { appendNote, formatAiExplanationNote } from "./aiNote";
+import { appendNote, formatAiExplanationNote } from "../ai/aiNote";
 import { createSelectorFromRange, LIUCAI_UI_SELECTOR, rangesFromSelectors } from "./domText";
 import { applyHighlight, removeHighlightFromDom, updateHighlightAttributes } from "./highlightDom";
 import { HoverRequestTracker } from "./hoverRequest";
-import { generateUuid } from "./id";
+import { generateUuid } from "../shared/id";
 import {
   AI_AUTH_STATE_STORAGE_KEY,
   LOCAL_DATABASE_SCOPE_STORAGE_KEY,
@@ -28,7 +28,7 @@ import {
   type AiExample,
   type StorageResponse,
   type SyncStatus,
-} from "./messages";
+} from "../shared/messages";
 import {
   createObsidianExportFilename,
   formatObsidianHighlight,
@@ -41,12 +41,12 @@ import {
   resolveInterfaceLocale,
   type ContentCopy,
   type ResolvedLocale,
-} from "./localization";
+} from "../shared/localization";
 import {
   normalizePreferences,
   PREFERENCES_STORAGE_KEY,
-} from "./preferences";
-import { isHostnameDisabled, setHostnameDisabled } from "./sitePreferences";
+} from "../shared/preferences";
+import { isHostnameDisabled, setHostnameDisabled } from "../settings/sitePreferences";
 import {
   getSelectionToolbarKind,
   getVisibleSelectionToolbarKind,
@@ -58,8 +58,8 @@ import {
   getHighlight,
   putHighlight,
   upsertPage,
-} from "./storageClient";
-import type { HighlightColor, HighlightRecord, PageRecord } from "./types";
+} from "../storage/storageClient";
+import type { HighlightColor, HighlightRecord, PageRecord } from "../shared/types";
 import {
   createPageIdentity,
   hasPageIdentityChanged,

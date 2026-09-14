@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { generateUuid, type UuidCrypto } from "../src/id.ts";
+import { generateUuid, type UuidCrypto } from "../src/shared/id.ts";
 
 test("uses randomUUID when available", () => {
   const expected = "123e4567-e89b-42d3-a456-426614174000";

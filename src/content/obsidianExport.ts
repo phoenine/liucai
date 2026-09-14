@@ -1,4 +1,4 @@
-import type { HighlightColor, HighlightRecord } from "./types";
+import type { HighlightColor, HighlightRecord } from "../shared/types";
 
 const COLOR_MARKERS: Record<HighlightColor, string> = {
   gold: "🟡",

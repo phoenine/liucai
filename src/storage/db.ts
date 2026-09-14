@@ -1,6 +1,6 @@
 import Dexie, { type Table } from "dexie";
-import { MAX_NOTE_LENGTH } from "./aiNote";
-import { generateUuid } from "./id";
+import { MAX_NOTE_LENGTH } from "../ai/aiNote";
+import { generateUuid } from "../shared/id";
 import type {
   HighlightDeletePayload,
   HighlightRecord,
@@ -9,7 +9,7 @@ import type {
   SyncEntityType,
   SyncBatchResult,
   SyncStateRecord,
-} from "./types";
+} from "../shared/types";
 
 export class LiucaiDatabase extends Dexie {
   pages!: Table<PageRecord, string>;

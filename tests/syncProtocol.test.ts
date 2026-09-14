@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { parseSyncBatchResult, toRemoteMutations } from "../src/syncProtocol.ts";
-import type { OutboxMutation } from "../src/types.ts";
+import { parseSyncBatchResult, toRemoteMutations } from "../src/sync/syncProtocol.ts";
+import type { OutboxMutation } from "../src/shared/types.ts";
 
 test("serializes only the mutation contract sent to Supabase", () => {
   const mutation: OutboxMutation = {

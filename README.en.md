@@ -98,6 +98,15 @@ npm run package
 - `npm run package` creates `artifacts/liucai-extension-v<version>.zip`
 - The ZIP root contains `manifest.json` directly and excludes source maps
 
+The `src/` root contains only the background, content, popup, and options build entry points and their styles. Internal modules are grouped by responsibility:
+
+- `content/`: page lifecycle, interactions, DOM, and content UI
+- `storage/`: IndexedDB and the content/background storage protocol
+- `sync/`: the Supabase client and synchronization protocol
+- `ai/`: model requests, streaming responses, and AI notes
+- `settings/`: model and site settings
+- `shared/`: types, messages, preferences, and localization shared across entry points
+
 ## Current limitations
 
 - Desktop Chrome and regular web page content only.
