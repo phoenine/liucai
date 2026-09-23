@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  getHighlightsCopy,
   getOptionsCopy,
   getPopupCopy,
   getContentCopy,
@@ -19,6 +20,8 @@ test("provides matching settings and popup copy for both locales", () => {
   assert.equal(getOptionsCopy("en").settings, "Settings");
   assert.equal(getPopupCopy("zh-CN").currentPage, "当前页面");
   assert.equal(getPopupCopy("en").currentPage, "Current page");
+  assert.equal(getHighlightsCopy("zh-CN").guestScope, "游客本地数据");
+  assert.equal(getHighlightsCopy("en").guestScope, "Local guest data");
   assert.equal(getContentCopy("zh-CN").editorTitle, "批注与标签");
   assert.equal(getContentCopy("en").editorTitle, "Note & tags");
   assert.equal(getContentCopy("en").highlightCount(1), "1 highlight");

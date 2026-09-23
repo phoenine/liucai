@@ -47,6 +47,7 @@ export interface OptionsCopy {
 export interface PopupCopy {
   tagline: string;
   settings: string;
+  viewAllHighlights: string;
   currentPage: string;
   cloudSync: string;
   checkingSync: string;
@@ -83,6 +84,92 @@ export interface PopupCopy {
   pageUnavailable: string;
   scriptUnavailable: string;
   siteUpdateFailed: string;
+}
+
+export type HighlightsView = "all" | "pages" | "tags" | "colors";
+export type HighlightsSort = "latest" | "oldest" | "position";
+
+export interface HighlightsCopy {
+  pageTitle: string;
+  brand: string;
+  tagline: string;
+  views: Record<HighlightsView, string>;
+  intro: string;
+  guestScope: string;
+  currentAccount: string;
+  total: (count: number) => string;
+  navigation: string;
+  collapseSidebar: string;
+  expandSidebar: string;
+  recentPages: string;
+  settings: string;
+  searchLabel: string;
+  searchPlaceholder: string;
+  filter: string;
+  filterWithNotes: string;
+  filterWithTags: string;
+  clearFilters: string;
+  sort: string;
+  sorts: Record<HighlightsSort, string>;
+  all: string;
+  colors: Record<"gold" | "mint" | "coral", string>;
+  colorFilter: string;
+  tagFilter: string;
+  allTags: string;
+  untagged: string;
+  pageFilter: string;
+  clearPageFilter: string;
+  layoutGrid: string;
+  layoutList: string;
+  loading: string;
+  loadFailed: string;
+  retry: string;
+  emptyTitle: string;
+  emptyDescription: string;
+  noResultsTitle: string;
+  noResultsDescription: string;
+  untitledPage: string;
+  pageHighlightCount: (count: number) => string;
+  openPage: string;
+  moreActions: string;
+  viewDetails: string;
+  expand: string;
+  copyText: string;
+  copied: string;
+  copyFailed: string;
+  delete: string;
+  confirmDelete: string;
+  deleting: string;
+  deleteFailed: string;
+  detailTitle: string;
+  closeDetails: string;
+  previous: string;
+  next: string;
+  note: string;
+  aiReading: string;
+  aiSignInRequired: string;
+  aiLoading: string;
+  aiAppendNote: string;
+  aiAppending: string;
+  aiAppended: string;
+  aiError: (code: string) => string;
+  collapseSection: string;
+  expandSection: string;
+  myNote: string;
+  addNote: string;
+  editNote: string;
+  notePlaceholder: string;
+  save: string;
+  saving: string;
+  cancelEdit: string;
+  saveFailed: string;
+  tags: string;
+  addTag: string;
+  tagPlaceholder: string;
+  removeTag: string;
+  source: string;
+  createdAt: (date: string) => string;
+  updatedAt: (date: string) => string;
 }
 
 export interface ContentCopy {
@@ -252,6 +339,7 @@ const POPUP_COPY: Record<ResolvedLocale, PopupCopy> = {
   "zh-CN": {
     tagline: "本地网页高亮与批注",
     settings: "设置",
+    viewAllHighlights: "查看全部划线",
     currentPage: "当前页面",
     cloudSync: "云端同步",
     checkingSync: "正在检查登录状态……",
@@ -292,6 +380,7 @@ const POPUP_COPY: Record<ResolvedLocale, PopupCopy> = {
   en: {
     tagline: "Local web highlights and notes",
     settings: "Settings",
+    viewAllHighlights: "View all highlights",
     currentPage: "Current page",
     cloudSync: "Cloud sync",
     checkingSync: "Checking sign-in status…",
@@ -328,6 +417,181 @@ const POPUP_COPY: Record<ResolvedLocale, PopupCopy> = {
     pageUnavailable: "The current page is unavailable.",
     scriptUnavailable: "Liucai is not available on this page. Try a regular webpage.",
     siteUpdateFailed: "Could not update the site setting.",
+  },
+};
+
+const HIGHLIGHTS_COPY: Record<ResolvedLocale, HighlightsCopy> = {
+  "zh-CN": {
+    pageTitle: "全部划线 · 六彩",
+    brand: "六彩 Liucai",
+    tagline: "让有价值的内容，不再散落",
+    views: { all: "全部划线", pages: "按网页", tags: "按标签", colors: "按颜色" },
+    intro: "按网页整理保存在当前数据空间中的划线、批注和标签。",
+    guestScope: "游客本地数据",
+    currentAccount: "当前账号",
+    total: (count) => `共 ${count} 条划线`,
+    navigation: "划线视图",
+    collapseSidebar: "收起侧边栏",
+    expandSidebar: "展开侧边栏",
+    recentPages: "最近网页",
+    settings: "设置",
+    searchLabel: "搜索划线",
+    searchPlaceholder: "搜索划线、网页或标签…",
+    filter: "筛选",
+    filterWithNotes: "仅看有批注",
+    filterWithTags: "仅看有标签",
+    clearFilters: "清除筛选",
+    sort: "排序",
+    sorts: { latest: "最新优先", oldest: "最早优先", position: "按原文顺序" },
+    all: "全部",
+    colors: { gold: "暖黄", mint: "薄荷", coral: "珊瑚" },
+    colorFilter: "按颜色筛选",
+    tagFilter: "按标签筛选",
+    allTags: "全部标签",
+    untagged: "无标签",
+    pageFilter: "当前网页",
+    clearPageFilter: "清除网页筛选",
+    layoutGrid: "网格视图",
+    layoutList: "列表视图",
+    loading: "正在读取划线……",
+    loadFailed: "划线读取失败，请重试。",
+    retry: "重试",
+    emptyTitle: "当前数据空间还没有划线",
+    emptyDescription: "在任意普通网页中划选文字，就可以在这里集中查看。",
+    noResultsTitle: "没有符合条件的划线",
+    noResultsDescription: "试试清除搜索词或更换筛选条件。",
+    untitledPage: "未命名网页",
+    pageHighlightCount: (count) => `${count} 条`,
+    openPage: "打开原网页",
+    moreActions: "更多操作",
+    viewDetails: "查看详情",
+    expand: "展开全文",
+    copyText: "复制原文",
+    copied: "已复制",
+    copyFailed: "复制失败",
+    delete: "删除",
+    confirmDelete: "确认删除",
+    deleting: "删除中…",
+    deleteFailed: "删除失败，请重试",
+    detailTitle: "划线详情",
+    closeDetails: "关闭详情",
+    previous: "上一条",
+    next: "下一条",
+    note: "批注",
+    aiReading: "AI 解读",
+    aiSignInRequired: "登录后可使用 AI 解读",
+    aiLoading: "正在解读…",
+    aiAppendNote: "补充到批注",
+    aiAppending: "补充中…",
+    aiAppended: "已补充到批注",
+    aiError: (code) => code === "AI_SIGN_IN_REQUIRED"
+      ? "登录后才能使用 AI 解读"
+      : code === "AI_MODEL_NOT_CONFIGURED"
+        ? "请先在设置中完成模型配置"
+        : "AI 解读失败，请重试",
+    collapseSection: "收起",
+    expandSection: "展开",
+    myNote: "我的批注",
+    addNote: "添加批注",
+    editNote: "编辑批注",
+    notePlaceholder: "写下你的想法…",
+    save: "保存",
+    saving: "保存中…",
+    cancelEdit: "取消",
+    saveFailed: "保存失败，请重试",
+    tags: "标签",
+    addTag: "添加标签",
+    tagPlaceholder: "输入标签",
+    removeTag: "移除标签",
+    source: "来源",
+    createdAt: (date) => `创建于 ${date}`,
+    updatedAt: (date) => `更新于 ${date}`,
+  },
+  en: {
+    pageTitle: "All highlights · Liucai",
+    brand: "Liucai",
+    tagline: "Keep what matters in one place",
+    views: { all: "All highlights", pages: "By page", tags: "By tag", colors: "By color" },
+    intro: "Browse highlights, notes, and tags saved in the current data space.",
+    guestScope: "Local guest data",
+    currentAccount: "Current account",
+    total: (count) => `${count} ${count === 1 ? "highlight" : "highlights"}`,
+    navigation: "Highlight views",
+    collapseSidebar: "Collapse sidebar",
+    expandSidebar: "Expand sidebar",
+    recentPages: "Recent pages",
+    settings: "Settings",
+    searchLabel: "Search highlights",
+    searchPlaceholder: "Search highlights, pages, or tags…",
+    filter: "Filter",
+    filterWithNotes: "With notes only",
+    filterWithTags: "With tags only",
+    clearFilters: "Clear filters",
+    sort: "Sort",
+    sorts: { latest: "Newest first", oldest: "Oldest first", position: "Page order" },
+    all: "All",
+    colors: { gold: "Warm Gold", mint: "Mint", coral: "Coral" },
+    colorFilter: "Filter by color",
+    tagFilter: "Filter by tag",
+    allTags: "All tags",
+    untagged: "Untagged",
+    pageFilter: "Current page",
+    clearPageFilter: "Clear page filter",
+    layoutGrid: "Grid view",
+    layoutList: "List view",
+    loading: "Loading highlights…",
+    loadFailed: "Could not load highlights. Please try again.",
+    retry: "Retry",
+    emptyTitle: "No highlights in this data space",
+    emptyDescription: "Select text on any regular webpage to collect it here.",
+    noResultsTitle: "No matching highlights",
+    noResultsDescription: "Clear the search or choose different filters.",
+    untitledPage: "Untitled page",
+    pageHighlightCount: (count) => `${count} ${count === 1 ? "highlight" : "highlights"}`,
+    openPage: "Open source page",
+    moreActions: "More actions",
+    viewDetails: "View details",
+    expand: "Show full text",
+    copyText: "Copy text",
+    copied: "Copied",
+    copyFailed: "Copy failed",
+    delete: "Delete",
+    confirmDelete: "Confirm delete",
+    deleting: "Deleting…",
+    deleteFailed: "Could not delete. Please try again.",
+    detailTitle: "Highlight details",
+    closeDetails: "Close details",
+    previous: "Previous",
+    next: "Next",
+    note: "Note",
+    aiReading: "AI reading",
+    aiSignInRequired: "Sign in to use AI reading",
+    aiLoading: "Reading…",
+    aiAppendNote: "Add to note",
+    aiAppending: "Adding…",
+    aiAppended: "Added to note",
+    aiError: (code) => code === "AI_SIGN_IN_REQUIRED"
+      ? "Sign in to use AI reading"
+      : code === "AI_MODEL_NOT_CONFIGURED"
+        ? "Complete the model setup in Settings first"
+        : "AI reading failed. Please try again.",
+    collapseSection: "Collapse",
+    expandSection: "Expand",
+    myNote: "My note",
+    addNote: "Add a note",
+    editNote: "Edit note",
+    notePlaceholder: "Write down your thoughts…",
+    save: "Save",
+    saving: "Saving…",
+    cancelEdit: "Cancel",
+    saveFailed: "Could not save. Please try again.",
+    tags: "Tags",
+    addTag: "Add tag",
+    tagPlaceholder: "Enter a tag",
+    removeTag: "Remove tag",
+    source: "Source",
+    createdAt: (date) => `Created ${date}`,
+    updatedAt: (date) => `Updated ${date}`,
   },
 };
 
@@ -480,6 +744,10 @@ export function getOptionsCopy(locale: ResolvedLocale): OptionsCopy {
 
 export function getPopupCopy(locale: ResolvedLocale): PopupCopy {
   return POPUP_COPY[locale];
+}
+
+export function getHighlightsCopy(locale: ResolvedLocale): HighlightsCopy {
+  return HIGHLIGHTS_COPY[locale];
 }
 
 export function getContentCopy(locale: ResolvedLocale): ContentCopy {

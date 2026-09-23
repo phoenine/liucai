@@ -48,6 +48,79 @@ test("stores pages once and queues only sync-relevant changes", async () => {
   assert.equal(await storage.db.outbox.count(), 1);
 });
 
+test("builds an active highlight library grouped by recent page activity", async () => {
+  const olderPage = await storage.upsertPage(
+    "https://example.com/older",
+    "https://example.com/older",
+    "Older page",
+  );
+  const newerPage = await storage.upsertPage(
+    "https://example.com/newer",
+    "https://example.com/newer",
+    "Newer page",
+  );
+  await storage.addHighlight({
+    ...createHighlight(olderPage.id),
+    id: "older-late-position",
+    canonicalUrl: olderPage.canonicalUrl,
+    selector: { ...createHighlight(olderPage.id).selector, start: 20 },
+    updatedAt: "2026-09-09T01:00:00.000Z",
+  });
+  await storage.addHighlight({
+    ...createHighlight(olderPage.id),
+    id: "older-early-position",
+    canonicalUrl: olderPage.canonicalUrl,
+    selector: { ...createHighlight(olderPage.id).selector, start: 5 },
+    updatedAt: "2026-09-09T02:00:00.000Z",
+  });
+  await storage.addHighlight({
+    ...createHighlight(newerPage.id),
+    id: "newest",
+    canonicalUrl: newerPage.canonicalUrl,
+    tags: ["reading"],
+    updatedAt: "2026-09-09T03:00:00.000Z",
+  });
+  await storage.putHighlight({
+    ...createHighlight(newerPage.id),
+    id: "deleted",
+    canonicalUrl: newerPage.canonicalUrl,
+    deletedAt: "2026-09-09T04:00:00.000Z",
+    updatedAt: "2026-09-09T04:00:00.000Z",
+  });
+
+  const library = await storage.getHighlightLibrary();
+
+  assert.equal(library.highlightCount, 3);
+  assert.deepEqual(library.groups.map((group) => group.page.title), ["Newer page", "Older page"]);
+  assert.deepEqual(
+    library.groups[1].highlights.map((highlight) => highlight.id),
+    ["older-early-position", "older-late-position"],
+  );
+  assert.deepEqual(library.groups[0].highlights[0].tags, ["reading"]);
+});
+
+test("reads the highlight library from the currently active guest or account database", async () => {
+  const guestPage = await storage.upsertPage(
+    "https://example.com/guest-library",
+    "https://example.com/guest-library",
+    "Guest library",
+  );
+  await storage.addHighlight({
+    ...createHighlight(guestPage.id),
+    canonicalUrl: guestPage.canonicalUrl,
+  });
+  assert.equal((await storage.getHighlightLibrary()).highlightCount, 1);
+
+  const account = await storage.activateLocalDatabase("library-user");
+  await account.delete();
+  await account.open();
+  assert.equal((await storage.getHighlightLibrary()).highlightCount, 0);
+
+  await storage.activateLocalDatabase(null);
+  assert.equal((await storage.getHighlightLibrary()).highlightCount, 1);
+  await account.delete();
+});
+
 test("serializes concurrent page creation for the same canonical URL", async () => {
   const pages = await Promise.all(Array.from({ length: 4 }, () => storage.upsertPage(
     "https://example.com/concurrent",

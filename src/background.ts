@@ -2,6 +2,7 @@ import {
   addHighlight,
   getActiveHighlights,
   getHighlight,
+  getHighlightLibrary,
   putHighlight,
   upsertPage,
 } from "./storage/db";
@@ -147,6 +148,8 @@ async function handleStorageRequest(request: StorageRequest): Promise<unknown> {
       return upsertPage(request.canonicalUrl, request.originalUrl, request.title);
     case "LIUCAI_STORAGE_GET_ACTIVE_HIGHLIGHTS":
       return getActiveHighlights(request.canonicalUrl);
+    case "LIUCAI_STORAGE_GET_HIGHLIGHT_LIBRARY":
+      return getHighlightLibrary();
     case "LIUCAI_STORAGE_GET_HIGHLIGHT":
       return getHighlight(request.id);
     case "LIUCAI_STORAGE_ADD_HIGHLIGHT":

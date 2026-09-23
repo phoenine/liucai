@@ -32,6 +32,17 @@ export interface HighlightRecord {
   deletedAt?: string;
 }
 
+export interface HighlightLibraryGroup {
+  page: PageRecord;
+  highlights: HighlightRecord[];
+  latestUpdatedAt: string;
+}
+
+export interface HighlightLibrary {
+  groups: HighlightLibraryGroup[];
+  highlightCount: number;
+}
+
 export interface HighlightDeletePayload {
   id: string;
   deletedAt: string;

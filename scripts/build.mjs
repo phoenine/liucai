@@ -89,8 +89,25 @@ await build({
   },
 });
 
+await build({
+  ...base,
+  build: {
+    ...base.build,
+    lib: {
+      entry: resolve(root, "src/highlights.tsx"),
+      name: "LiucaiHighlights",
+      formats: ["iife"],
+      fileName: () => "highlights.js",
+    },
+    rollupOptions: {
+      output: inlineIifeOutput("highlights.css"),
+    },
+  },
+});
+
 await verifyHtmlCssContract("popup.html", "liucai.css");
 await verifyHtmlCssContract("options.html", "options.css");
+await verifyHtmlCssContract("highlights.html", "highlights.css");
 
 async function verifyHtmlCssContract(htmlFilename, cssFilename) {
   const html = await readFile(resolve(dist, htmlFilename), "utf8");

@@ -1,4 +1,4 @@
-import type { HighlightRecord } from "./types";
+import type { HighlightLibrary, HighlightRecord } from "./types";
 
 export const AI_AUTH_STATE_STORAGE_KEY = "liucai.ai.signedIn";
 export const LOCAL_DATABASE_SCOPE_STORAGE_KEY = "liucai.storage.scope.v1";
@@ -93,9 +93,12 @@ export type StorageRequest =
     title: string;
   }
   | { type: "LIUCAI_STORAGE_GET_ACTIVE_HIGHLIGHTS"; canonicalUrl: string }
+  | { type: "LIUCAI_STORAGE_GET_HIGHLIGHT_LIBRARY" }
   | { type: "LIUCAI_STORAGE_GET_HIGHLIGHT"; id: string }
   | { type: "LIUCAI_STORAGE_ADD_HIGHLIGHT"; record: HighlightRecord }
   | { type: "LIUCAI_STORAGE_PUT_HIGHLIGHT"; record: HighlightRecord };
+
+export type HighlightLibraryResponse = StorageResponse<HighlightLibrary>;
 
 export type StorageResponse<T> =
   | { ok: true; data: T }
@@ -117,6 +120,7 @@ export function isSetSiteDisabledRequest(message: unknown): message is SetSiteDi
 const STORAGE_MESSAGE_TYPES = new Set<StorageRequest["type"]>([
   "LIUCAI_STORAGE_UPSERT_PAGE",
   "LIUCAI_STORAGE_GET_ACTIVE_HIGHLIGHTS",
+  "LIUCAI_STORAGE_GET_HIGHLIGHT_LIBRARY",
   "LIUCAI_STORAGE_GET_HIGHLIGHT",
   "LIUCAI_STORAGE_ADD_HIGHLIGHT",
   "LIUCAI_STORAGE_PUT_HIGHLIGHT",
