@@ -1172,6 +1172,9 @@ export class ContentController {
       hostname: this.hostname,
       title: document.title,
       highlightCount: records.length,
+      noteCount: records.filter((record) => record.note.trim().length > 0).length,
+      tagCount: new Set(records.flatMap((record) => record.tags.map((tag) => tag.trim()).filter(Boolean))).size,
+      maskCount: 0,
       disabled,
     };
   }

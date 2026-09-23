@@ -1,4 +1,13 @@
-import { GearSixIcon, ListBulletsIcon } from "@phosphor-icons/react";
+import {
+  BrainIcon,
+  ChatCircleIcon,
+  GearSixIcon,
+  InfoIcon,
+  ListBulletsIcon,
+  PencilSimpleIcon,
+  QuestionIcon,
+  TagIcon,
+} from "@phosphor-icons/react";
 import { useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
 import type {
@@ -15,6 +24,9 @@ import {
 } from "./shared/localization";
 import { DEFAULT_PREFERENCES, loadPreferences } from "./shared/preferences";
 import "./popup.css";
+
+const HELP_URL = "https://github.com/phoenine/liucai/issues/new";
+const ABOUT_URL = "https://github.com/phoenine/liucai";
 
 type LoadState =
   | { status: "loading" }
@@ -131,7 +143,7 @@ function PopupApp() {
         </button>
       </header>
 
-      <section className={`lc-popup__card lc-popup__status${siteDisabled ? " lc-popup__status--disabled" : ""}`}>
+      <section className="lc-popup__card lc-popup__status">
         <h2>{copy.currentPage}</h2>
         {renderStatus(state, copy)}
       </section>
@@ -198,20 +210,21 @@ function PopupApp() {
         ) : null}
       </section>
 
-      <section className="lc-popup__card">
-        <h2>{copy.quickActions}</h2>
-        <ul>
-          <li>{copy.selectionAction}</li>
-          <li>{copy.existingHighlightAction}</li>
-          <li>{copy.learningSelectionAction}</li>
-          <li>{copy.localStorageAction}</li>
-        </ul>
-      </section>
+      {syncStatus && !syncStatus.signedIn ? (
+        <section className="lc-popup__card">
+          <h2>{copy.quickActions}</h2>
+          <ul>
+            <li>{copy.selectionAction}</li>
+            <li>{copy.existingHighlightAction}</li>
+            <li>{copy.learningSelectionAction}</li>
+          </ul>
+        </section>
+      ) : null}
 
       {page?.hostname ? (
-        <section className="lc-popup__card lc-popup__site-action">
+        <>
           <button
-            className={`lc-popup__site-button${siteDisabled ? " lc-popup__site-button--restore" : ""}`}
+            className="lc-popup__site-button"
             disabled={updating}
             onClick={() => void toggleCurrentSite()}
             type="button"
@@ -219,10 +232,30 @@ function PopupApp() {
             {updating ? copy.updating : siteDisabled ? copy.restoreSite : copy.disableSite}
           </button>
           {actionError ? <p className="lc-popup__action-error" role="alert">{actionError}</p> : null}
-        </section>
+        </>
       ) : null}
+
+      <footer className="lc-popup__footer">
+        <button onClick={() => void openExternal(HELP_URL)} type="button">
+          <QuestionIcon aria-hidden="true" size={14} />
+          {copy.helpFeedback}
+        </button>
+        <button onClick={() => void openExternal(ABOUT_URL)} type="button">
+          <InfoIcon aria-hidden="true" size={14} />
+          {copy.about}
+        </button>
+      </footer>
     </main>
   );
+}
+
+async function openExternal(url: string): Promise<void> {
+  if (typeof chrome !== "undefined" && chrome.tabs?.create) {
+    await chrome.tabs.create({ url });
+    window.close();
+    return;
+  }
+  window.open(url, "_blank", "noopener");
 }
 
 async function openSettings(): Promise<void> {
@@ -278,25 +311,35 @@ function renderStatus(state: LoadState, copy: PopupCopy) {
     return <p className="lc-popup__muted">{state.message}</p>;
   }
 
-  const count = state.page.highlightCount ?? 0;
-  if (state.page.disabled) {
-    return (
-      <div>
-        <div className="lc-popup__disabled-state">{copy.disabled}</div>
-        <p className="lc-popup__muted">
-          {state.page.hostname ? `${state.page.hostname} · ${copy.siteDisabled}` : copy.siteDisabled}
-        </p>
-        {state.page.title ? <p className="lc-popup__title" title={state.page.title}>{state.page.title}</p> : null}
-      </div>
-    );
-  }
-
   return (
     <div>
-      <div className="lc-popup__count">{count}</div>
-      <p className="lc-popup__muted">{copy.highlightCount}</p>
       {state.page.title ? <p className="lc-popup__title" title={state.page.title}>{state.page.title}</p> : null}
+      <PageStats copy={copy} page={state.page} />
+      {state.page.disabled ? <p className="lc-popup__disabled-note">{copy.siteDisabled}</p> : null}
     </div>
+  );
+}
+
+function PageStats({ copy, page }: { copy: PopupCopy; page: PageStatus }) {
+  const items = [
+    { icon: PencilSimpleIcon, tone: "highlight", label: copy.statHighlights, value: page.highlightCount },
+    { icon: ChatCircleIcon, tone: "note", label: copy.statNotes, value: page.noteCount },
+    { icon: TagIcon, tone: "tag", label: copy.statTags, value: page.tagCount },
+    { icon: BrainIcon, tone: "mask", label: copy.statMasks, value: page.maskCount },
+  ];
+
+  return (
+    <ul aria-label={copy.currentPage} className="lc-popup__stats" data-disabled={page.disabled ? "true" : undefined}>
+      {items.map((item) => (
+        <li key={item.label}>
+          <span className="lc-popup__stat-value">
+            <item.icon aria-hidden="true" className={`lc-popup__stat-icon lc-popup__stat-icon--${item.tone}`} size={15} weight="regular" />
+            {item.value}
+          </span>
+          <span className="lc-popup__stat-label">{item.label}</span>
+        </li>
+      ))}
+    </ul>
   );
 }
 

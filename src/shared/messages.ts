@@ -75,6 +75,9 @@ export interface PageStatus {
   hostname: string;
   title: string;
   highlightCount: number;
+  noteCount: number;
+  tagCount: number;
+  maskCount: number;
   disabled: boolean;
 }
 

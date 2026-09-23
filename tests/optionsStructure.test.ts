@@ -29,6 +29,48 @@ test("uses the extension image icon in popup and settings branding", async () =>
   assert.doesNotMatch(options, /className="lc-options__logo">六/);
 });
 
+test("summarizes the current page and keeps a quiet footer", async () => {
+  const [popup, styles, localization] = await Promise.all([
+    readFile(new URL("../src/popup.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../src/popup.css", import.meta.url), "utf8"),
+    readFile(new URL("../src/shared/localization.ts", import.meta.url), "utf8"),
+  ]);
+
+  assert.match(popup, /copy\.statHighlights/);
+  assert.match(popup, /copy\.statNotes/);
+  assert.match(popup, /copy\.statTags/);
+  assert.match(popup, /copy\.statMasks/);
+  assert.match(popup, /copy\.helpFeedback/);
+  assert.match(popup, /copy\.about/);
+  assert.match(popup, /const ABOUT_URL = "https:\/\/github\.com\/phoenine\/liucai";/);
+  assert.match(popup, /openExternal\(ABOUT_URL\)/);
+  assert.doesNotMatch(popup, /lc-popup__count|localStorageAction|page\.hostname/);
+  assert.match(styles, /\.lc-popup__stats[\s\S]*grid-template-columns:\s*repeat\(4, minmax\(0, 1fr\)\)/);
+  assert.match(styles, /\.lc-popup\s*\{[^}]*padding:\s*14px;/s);
+  assert.doesNotMatch(styles, /\.lc-popup\s*\{[^}]*(?:border|box-shadow|background):/s);
+  assert.match(styles, /\.lc-popup__card\s*\{[^}]*border-radius:\s*14px;/s);
+  assert.match(styles, /\.lc-popup__footer\s*\{[^}]*border-top:\s*1px solid #edf0f4;[^}]*margin-top:\s*16px;/s);
+  assert.match(styles, /\.lc-popup__footer button\s*\{[^}]*background:\s*transparent;[^}]*border:\s*0;[^}]*box-shadow:\s*none;/s);
+  assert.match(styles, /\.lc-popup__footer button:hover\s*\{[^}]*background:\s*#f1f4f8;/s);
+  assert.doesNotMatch(styles, /\.lc-popup__footer button \+ button::before/);
+  assert.match(localization, /statMasks: "遮罩"/);
+  assert.doesNotMatch(localization, /数据保存到 Chrome IndexedDB/);
+  assert.match(popup, /syncStatus && !syncStatus\.signedIn \? \([\s\S]*copy\.quickActions/);
+  assert.match(styles, /\.lc-popup__site-button\s*\{[^}]*background:\s*#ffffff;[^}]*height:\s*40px;/s);
+  assert.doesNotMatch(styles, /\.lc-popup__site-button--restore/);
+  assert.doesNotMatch(styles, /\.lc-popup__status--disabled/);
+  assert.match(popup, /PencilSimpleIcon[\s\S]*ChatCircleIcon[\s\S]*TagIcon[\s\S]*BrainIcon[\s\S]*weight="regular"/);
+  assert.match(styles, /\.lc-popup__stat-icon--highlight\s*\{[^}]*color:\s*#d97706;/s);
+  assert.match(styles, /\.lc-popup__stat-icon--note\s*\{[^}]*color:\s*#1078f8;/s);
+  assert.match(styles, /\.lc-popup__stat-icon--tag\s*\{[^}]*color:\s*#8040f8;/s);
+  assert.match(styles, /\.lc-popup__stat-icon--mask\s*\{[^}]*color:\s*#f86038;/s);
+  assert.match(styles, /\.lc-popup__stat-value\s*\{[^}]*display:\s*inline-flex;[^}]*font-size:\s*18px;[^}]*justify-content:\s*center;/s);
+  assert.match(styles, /\.lc-popup__stats\[data-disabled="true"\] \.lc-popup__stat-value svg\s*\{[^}]*opacity:\s*0\.55;/s);
+  assert.match(styles, /\.lc-popup__title\s*\{[^}]*font-weight:\s*400;/s);
+  assert.match(localization, /siteDisabled: "此网站已禁用划线"/);
+  assert.match(styles, /\.lc-popup__disabled-note\s*\{[^}]*border-top:\s*1px solid #edf0f4;[^}]*color:\s*#dc2626;/s);
+});
+
 test("keeps cloud auth neutral until the stored session status is loaded", async () => {
   const popup = await readFile(new URL("../src/popup.tsx", import.meta.url), "utf8");
   const localization = await readFile(new URL("../src/shared/localization.ts", import.meta.url), "utf8");

@@ -66,7 +66,6 @@ export interface PopupCopy {
   selectionAction: string;
   existingHighlightAction: string;
   learningSelectionAction: string;
-  localStorageAction: string;
   updating: string;
   restoreSite: string;
   disableSite: string;
@@ -77,9 +76,13 @@ export interface PopupCopy {
   awaitingFirstSync: string;
   syncUnavailable: string;
   readingPage: string;
-  disabled: string;
   siteDisabled: string;
-  highlightCount: string;
+  statHighlights: string;
+  statNotes: string;
+  statTags: string;
+  statMasks: string;
+  helpFeedback: string;
+  about: string;
   tabNotFound: string;
   pageUnavailable: string;
   scriptUnavailable: string;
@@ -358,7 +361,6 @@ const POPUP_COPY: Record<ResolvedLocale, PopupCopy> = {
     selectionAction: "首次划选：三色高亮 + 批注 + 标签；登录后显示 AI",
     existingHighlightAction: "点击已划线：调色盘 + 批注 + 标签 + 复制 + 删除",
     learningSelectionAction: "高亮内再次划选：登录后显示 AI 学习工具条",
-    localStorageAction: "数据保存到 Chrome IndexedDB",
     updating: "正在更新……",
     restoreSite: "恢复此网站划线",
     disableSite: "在此网站禁用划线",
@@ -369,9 +371,13 @@ const POPUP_COPY: Record<ResolvedLocale, PopupCopy> = {
     awaitingFirstSync: "已登录，等待首次同步",
     syncUnavailable: "同步服务暂不可用。",
     readingPage: "正在读取当前页状态……",
-    disabled: "已禁用",
-    siteDisabled: "此域名不显示划线入口",
-    highlightCount: "当前页高亮数量",
+    siteDisabled: "此网站已禁用划线",
+    statHighlights: "高亮",
+    statNotes: "批注",
+    statTags: "标签",
+    statMasks: "遮罩",
+    helpFeedback: "帮助与反馈",
+    about: "关于六彩",
     tabNotFound: "未找到当前标签页。",
     pageUnavailable: "当前页面暂不可读取。",
     scriptUnavailable: "当前页面未注入六彩脚本，请在普通网页中使用。",
@@ -399,7 +405,6 @@ const POPUP_COPY: Record<ResolvedLocale, PopupCopy> = {
     selectionAction: "First selection: colors + note + tags; AI appears when signed in",
     existingHighlightAction: "Click a highlight: color + note + tags + copy + delete",
     learningSelectionAction: "Select inside a highlight: AI learning toolbar when signed in",
-    localStorageAction: "Data is stored in Chrome IndexedDB",
     updating: "Updating…",
     restoreSite: "Enable highlights on this site",
     disableSite: "Disable highlights on this site",
@@ -410,9 +415,13 @@ const POPUP_COPY: Record<ResolvedLocale, PopupCopy> = {
     awaitingFirstSync: "Signed in, waiting for the first sync",
     syncUnavailable: "Sync is temporarily unavailable.",
     readingPage: "Reading the current page…",
-    disabled: "Disabled",
-    siteDisabled: "Highlight controls are hidden on this domain",
-    highlightCount: "Highlights on this page",
+    siteDisabled: "Highlighting is off for this site",
+    statHighlights: "Highlights",
+    statNotes: "Notes",
+    statTags: "Tags",
+    statMasks: "Masks",
+    helpFeedback: "Help & feedback",
+    about: "About Liucai",
     tabNotFound: "Could not find the current tab.",
     pageUnavailable: "The current page is unavailable.",
     scriptUnavailable: "Liucai is not available on this page. Try a regular webpage.",
