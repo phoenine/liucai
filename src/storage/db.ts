@@ -3,6 +3,8 @@ import { MAX_NOTE_LENGTH } from "../ai/aiNote";
 import { generateUuid } from "../shared/id";
 import type {
   HighlightDeletePayload,
+  HighlightLibrary,
+  HighlightLibraryGroup,
   HighlightRecord,
   OutboxMutation,
   PageRecord,
@@ -176,6 +178,56 @@ export async function getActiveHighlights(
     .filter((record) => !record.deletedAt)
     .map(normalizeHighlightRecord)
     .sort((a, b) => a.selector.start - b.selector.start);
+}
+
+export async function getHighlightLibrary(
+  database: LiucaiDatabase = db,
+): Promise<HighlightLibrary> {
+  return database.transaction("r", database.pages, database.highlights, async () => {
+    const [pages, storedHighlights] = await Promise.all([
+      database.pages.toArray(),
+      database.highlights.toArray(),
+    ]);
+    const pagesById = new Map(pages.map((page) => [page.id, page]));
+    const groupsByPageId = new Map<string, HighlightLibraryGroup>();
+    let highlightCount = 0;
+
+    for (const storedHighlight of storedHighlights) {
+      if (storedHighlight.deletedAt) continue;
+      const page = pagesById.get(storedHighlight.pageId);
+      if (!page) continue;
+
+      const highlight = normalizeHighlightRecord(storedHighlight);
+      const group = groupsByPageId.get(page.id);
+      if (group) {
+        group.highlights.push(highlight);
+        if (highlight.updatedAt > group.latestUpdatedAt) {
+          group.latestUpdatedAt = highlight.updatedAt;
+        }
+      } else {
+        groupsByPageId.set(page.id, {
+          page,
+          highlights: [highlight],
+          latestUpdatedAt: highlight.updatedAt,
+        });
+      }
+      highlightCount += 1;
+    }
+
+    const groups = Array.from(groupsByPageId.values());
+    for (const group of groups) {
+      group.highlights.sort((left, right) => (
+        left.selector.start - right.selector.start
+        || left.createdAt.localeCompare(right.createdAt)
+      ));
+    }
+    groups.sort((left, right) => (
+      right.latestUpdatedAt.localeCompare(left.latestUpdatedAt)
+      || left.page.title.localeCompare(right.page.title)
+    ));
+
+    return { groups, highlightCount };
+  });
 }
 
 export function normalizeHighlightRecord(record: HighlightRecord): HighlightRecord {

@@ -110,6 +110,7 @@ test("recognizes extension storage requests", () => {
     type: "LIUCAI_STORAGE_GET_ACTIVE_HIGHLIGHTS",
     canonicalUrl: "https://example.com/article",
   }), true);
+  assert.equal(isStorageRequest({ type: "LIUCAI_STORAGE_GET_HIGHLIGHT_LIBRARY" }), true);
   assert.equal(isStorageRequest({ type: "LIUCAI_GET_PAGE_STATUS" }), false);
   assert.equal(isStorageRequest(null), false);
 });

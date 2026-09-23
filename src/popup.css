@@ -92,6 +92,34 @@ p {
   margin-top: 10px;
 }
 
+.lc-popup__library-button {
+  align-items: center;
+  background: #0f172a;
+  border: 1px solid #0f172a;
+  border-radius: 11px;
+  color: #ffffff;
+  cursor: pointer;
+  display: flex;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 750;
+  gap: 8px;
+  height: 40px;
+  justify-content: center;
+  margin: 10px 0;
+  width: 100%;
+}
+
+.lc-popup__library-button:focus-visible {
+  box-shadow: 0 0 0 3px rgba(15, 23, 42, 0.18);
+  outline: 2px solid #475569;
+  outline-offset: 1px;
+}
+
+.lc-popup__library-button + .lc-popup__card {
+  margin-top: 0;
+}
+
 .lc-popup__card ul {
   color: #475569;
   font-size: 12px;

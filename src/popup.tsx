@@ -1,4 +1,4 @@
-import { GearSixIcon } from "@phosphor-icons/react";
+import { GearSixIcon, ListBulletsIcon } from "@phosphor-icons/react";
 import { useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
 import type {
@@ -136,6 +136,15 @@ function PopupApp() {
         {renderStatus(state, copy)}
       </section>
 
+      <button
+        className="lc-popup__library-button"
+        onClick={() => void openHighlights()}
+        type="button"
+      >
+        <ListBulletsIcon aria-hidden="true" size={18} weight="bold" />
+        {copy.viewAllHighlights}
+      </button>
+
       <section className="lc-popup__card lc-popup__sync">
         <h2>{copy.cloudSync}</h2>
         {syncStatus === null ? (
@@ -223,6 +232,18 @@ async function openSettings(): Promise<void> {
   }
 
   window.location.href = "options.html";
+}
+
+async function openHighlights(): Promise<void> {
+  const url = typeof chrome !== "undefined" && chrome.runtime?.getURL
+    ? chrome.runtime.getURL("highlights.html")
+    : "highlights.html";
+  if (typeof chrome !== "undefined" && chrome.tabs?.create) {
+    await chrome.tabs.create({ url });
+    window.close();
+    return;
+  }
+  window.location.href = url;
 }
 
 function formatSyncSummary(
